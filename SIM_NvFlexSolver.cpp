@@ -47,20 +47,21 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 					GA_ROHandleV3 phnd(gdp->getP());
 					GA_ROHandleV3 vhnd(gdp->findPointAttribute("v"));
 					GA_ROHandleI ihnd(gdp->findPointAttribute("iid"));
+					GA_ROHandleI phshnd(gdp->findPointAttribute("phs"));
 
 					int* indices = nvdata->_indices.get();
 					int nactives = NvFlexExtGetActiveList(consolv->container(), indices);
 
-					if (phnd.isValid() && vhnd.isValid() && ihnd.isValid()) {
+					if (phnd.isValid() && vhnd.isValid() && ihnd.isValid() && phshnd.isValid()) {
 						NvFlexExtParticleData pdat = NvFlexExtMapParticleData(consolv->container());
 
 						GA_Size ngdpoints = gdp->getNumPoints();
 						bool reget = false;
 						if (nactives < ngdpoints) {
-							int nptscount=NvFlexExtAllocParticles(consolv->container(), ngdpoints - nactives, indices);
-							for (int npi = 0; npi < nptscount; ++npi) {
+							int nptscount=NvFlexExtAllocParticles(consolv->container(), ngdpoints - nactives, indices); //whoa! carefull with that! your luck the mapped buffer is not reallocated during this operation!
+							/*for (int npi = 0; npi < nptscount; ++npi) {
 								pdat.phases[indices[npi]] = eNvFlexPhaseSelfCollide | eNvFlexPhaseFluid;
-							}
+							}*/
 							reget = true;
 						}
 						else if (nactives > ngdpoints) {
@@ -70,18 +71,18 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 						if (reget) nactives = NvFlexExtGetActiveList(consolv->container(), indices);
 
 						GA_Offset bst, bed;
-						int nactivecount = 0;
 						bool stoploop = false;
-						for (GA_Iterator it(gdp->getPointRange()); it.blockAdvance(bst, bed);) {
+						for (GA_Iterator it(gdp->getPointRange()); it.blockAdvance(bst, bed);) { //TODO: make it threaded after debugged
 							for (GA_Offset off = bst; off < bed; ++off) {
 								UT_Vector3F p = phnd.get(off);
 								UT_Vector3F v = vhnd.get(off);
 
-								if (nactivecount >= nactives) {
+								GA_Index idx = gdp->pointIndex(off);
+								if (idx >= nactives) {
 									stoploop = true;
 									break;
 								}
-								int iid = indices[nactivecount];
+								int iid = indices[idx];
 								int iid4 = iid * 4;
 								int iid3 = iid * 3;
 								pdat.particles[iid4 + 0] = p.x();
@@ -92,12 +93,18 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 								pdat.velocities[iid3 + 0] = v.x();
 								pdat.velocities[iid3 + 1] = v.y();
 								pdat.velocities[iid3 + 2] = v.z();
-								++nactivecount;
+
+								pdat.phases[iid] = phshnd.get(off);
 							}
 							if (stoploop)break;
 						}
 						
 						NvFlexExtUnmapParticleData(consolv->container());
+
+						//Push NvFlex data to GPU. since it's async - we need to do it as far from the solver tick as possible to use this time to do CPU work
+						NvFlexExtPushToDevice(consolv->container()); //This pushes all from particle data returned by map. so collisions we can push separately.
+						//Also note that as long as we don't call anything with nvFlexExtAssets - we are free to rebind springs manually.
+						
 					}
 
 				}
@@ -107,8 +114,6 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 
 		
 		
-		//Push NvFlex data to GPU. since it's async - we need to do it as far from the solver tick as possible to use this time to do CPU work
-		NvFlexExtPushToDevice(consolv->container());
 		
 		// Updating collision Geometry.
 		// TODO: kill/deactivate meshes that are no longer in relationships
@@ -181,7 +186,7 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 						GA_Index sttidx = -1;
 						GA_Index prvidx = -1;
 						for (int vi = 0; vi < pvlr.entries(); ++vi) {
-							GA_Index idx = gdp->vertexIndex(pvlr(vi));//gdp->pointIndex(gdp->vertexPoint(pvlr(vi)));
+							GA_Index idx = gdp->pointIndex(gdp->vertexPoint(pvlr(vi)));//gdp->vertexIndex(pvlr(vi));//
 							if (vi == 0)sttidx = idx;
 							else if (vi > 1) {
 								//invert order cuz houdini goes clockwise
@@ -199,6 +204,7 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 			colldata->unmapall();
 			colldata->setCollisionData(consolv->solver());
 		}
+
 
 		nvparams.numIterations = getIterations();
 		int substeps = getSubsteps();
@@ -219,7 +225,7 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 			int* iindex = nvdata->_indices.get(); //TODO: indices dont change - if we got them before solve - keep them!
 			int nactives = NvFlexExtGetActiveList(consolv->container(), iindex); //HERE I REEEEALLY HOPE nooe accesses it right now
 			
-			const bool recreateGeo = nactives != dgp->getNumPoints();
+			const bool recreateGeo = nactives != dgp->getNumPoints(); //This basically should never happen with current workflow
 
 			if(recreateGeo)dgp->stashAll();
 
@@ -250,18 +256,16 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 			if(recreateGeo)GA_Offset off = dgp->appendPointBlock(nactives);
 
 			GA_Offset ostt, oend;
-			exint i = 0;
-			for (GA_Iterator oit(dgp->getPointRange()); oit.blockAdvance(ostt, oend);) {
+			for (GA_Iterator oit(dgp->getPointRange()); oit.blockAdvance(ostt, oend);) { //TODO: make it threaded after debugged
 				for (GA_Offset curroff = ostt; curroff < oend; ++curroff) {
 					UT_Vector3 pp;
-					int ii = iindex[i];
+					int ii = iindex[dgp->pointIndex(curroff)];
 					pp.assign(pdat.particles[ii * 4 + 0], pdat.particles[ii * 4 + 1], pdat.particles[ii * 4 + 2]);
 					dgp->setPos3(curroff, pp);
 					pp.assign(pdat.velocities[ii * 3 + 0], pdat.velocities[ii * 3 + 1], pdat.velocities[ii * 3 + 2]);
 					vhd.set(curroff, pp);
 					iidhd.set(curroff, ii);
 					phshd.set(curroff, pdat.phases[ii]);
-					++i;
 				}
 			}
 			NvFlexExtUnmapParticleData(consolv->container());//unmapping
@@ -280,7 +284,7 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 void SIM_NvFlexSolver::initializeSubclass()
 {
 	SIM_Solver::initializeSubclass();
-	if(SIM_NvFlexData::nvFlexLibrary == NULL)SIM_NvFlexData::nvFlexLibrary=NvFlexInit();
+	//if(SIM_NvFlexData::nvFlexLibrary == NULL)SIM_NvFlexData::nvFlexLibrary=NvFlexInit();
 	
 	//if(!nvparams)nvparams.reset(new NvFlexParams); //we don't need to reset it every every time i guess
 	
