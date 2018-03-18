@@ -20,9 +20,19 @@ class SIM_NvFlexData:public SIM_Data, public SIM_OptionsUser
 public:
 	class NvFlexContainerWrapper {
 	public:
-		explicit NvFlexContainerWrapper(NvFlexLibrary*lib, int maxParticles, int MaxDiffuseParticles, int maxNeighbours = 96) {
+		typedef struct NvFlexHSpringData {
+			int* springIds;
+			float* springRls;
+			float* springSts;
+
+			NvFlexHSpringData(int*sid, float*srl, float*sts):springIds(sid),springRls(srl),springSts(sts){}
+		} NvFlexHSpringData;
+
+		explicit NvFlexContainerWrapper(NvFlexLibrary*lib, int maxParticles, int MaxDiffuseParticles, int maxNeighbours = 96):springIndices(lib),springRestLengths(lib),springStrenghts(lib) {
 			slv = NvFlexCreateSolver(lib, maxParticles, MaxDiffuseParticles, maxNeighbours);
+			if (slv == NULL)throw std::runtime_error("NULL NVFLEX SOLVER!");
 			cont = NvFlexExtCreateContainer(lib, slv, maxParticles);
+			if (cont == NULL)throw std::runtime_error("NULL NVFLEX CONTAINER!");
 			colld = new NvFlexHCollisionData(lib);
 		}
 		NvFlexContainerWrapper(NvFlexContainerWrapper&) = delete;
@@ -35,10 +45,42 @@ public:
 		NvFlexSolver* solver() { return slv; }
 		NvFlexExtContainer * container() { return cont; }
 		NvFlexHCollisionData* collisionData() { return colld; }
+
+		//springs
+		int getSpringDataSize()const { return springRestLengths.size(); }
+		void resizeSpringData(int newSize) {
+			/// be sure data is NOT MAPPED before here
+			/// cuz all previous pointers will be invalidated
+			springIndices.resize(newSize);
+			springRestLengths.resize(newSize);
+			springStrenghts.resize(newSize);
+			springIndices.unmap();
+			springRestLengths.unmap();
+			springStrenghts.unmap();
+		}
+		NvFlexHSpringData mapSpringData(){
+			springIndices.map();
+			springRestLengths.map();
+			springStrenghts.map();
+			return NvFlexHSpringData(springIndices.mappedPtr, springRestLengths.mappedPtr, springStrenghts.mappedPtr);
+		}
+		void unmapSpringData() {
+			springIndices.unmap();
+			springRestLengths.unmap();
+			springStrenghts.unmap();
+		}
+		void pushSpringsToDevice() {
+			NvFlexSetSprings(slv, springIndices.buffer, springRestLengths.buffer, springStrenghts.buffer, springRestLengths.size());
+		}
 	private:
 		NvFlexHCollisionData* colld;
 		NvFlexSolver* slv;
 		NvFlexExtContainer* cont;
+
+		//springs
+		NvFlexVector<int> springIndices;
+		NvFlexVector<float> springRestLengths;
+		NvFlexVector<float> springStrenghts;
 	};
 
 	
