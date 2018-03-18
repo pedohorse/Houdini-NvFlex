@@ -35,7 +35,7 @@ void SIM_NvFlexData::initializeSubclass() {
 	CreateFluidParticleGrid(ptd, _indices.get(), Vec3(0, restDistance, 0), x, y, z, restDistance, Vec3(0.0f), 1, eNvFlexPhaseSelfCollide | eNvFlexPhaseFluid);
 	*/
 
-	NvFlexExtUnmapParticleData(nvdata->container());
+	//NvFlexExtUnmapParticleData(nvdata->container());
 }
 
 void SIM_NvFlexData::makeEqualSubclass(const SIM_Data* source) {
@@ -65,11 +65,30 @@ const SIM_DopDescription* SIM_NvFlexData::getDescriptionForFucktory() {
 	return &desc;
 }
 
+static void nvFlexErrorCallbackPrint(NvFlexErrorSeverity type, const char *msg, const char *file, int line) {
+	switch (type) {
+	case eNvFlexLogError:
+		std::cout << "NvF ERROR: "; break;
+	case eNvFlexLogWarning:
+		std::cout << "NvF WARNING: "; break;
+	case eNvFlexLogDebug:
+		std::cout << "NvF DEBUG: "; break;
+	case eNvFlexLogAll:
+		std::cout << "NvF ALL: "; break;
+	}
+	if (msg != NULL)std::cout << msg;
+	std::cout << " :: ";
+	if (file != NULL)std::cout << file;
+	std::cout << " :: ";
+	std::cout << line;
+	std::cout << std::endl;
+
+}
 
 
 SIM_NvFlexData::SIM_NvFlexData(const SIM_DataFactory*fack):SIM_Data(fack),SIM_OptionsUser(this), _indices(nullptr_t(), std::default_delete<int[]>()), _lastGdpPId(-1){
 	if (nvFlexLibrary == NULL) {
-		nvFlexLibrary = NvFlexInit();
+		nvFlexLibrary = NvFlexInit(110, &nvFlexErrorCallbackPrint);
 	}
 }
 
