@@ -51,9 +51,14 @@ public:
 		void resizeSpringData(int newSize) {
 			/// be sure data is NOT MAPPED before here
 			/// cuz all previous pointers will be invalidated
-			springIndices.resize(newSize);
+			springIndices.map();
+			springRestLengths.map();
+			springStrenghts.map();
+
+			springIndices.resize(2*newSize);
 			springRestLengths.resize(newSize);
 			springStrenghts.resize(newSize);
+
 			springIndices.unmap();
 			springRestLengths.unmap();
 			springStrenghts.unmap();
