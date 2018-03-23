@@ -16,14 +16,29 @@ public:
 	GET_DATA_FUNC_F("radius", Radius);
 	GETSET_DATA_FUNCS_I("iterations", Iterations);
 	GETSET_DATA_FUNCS_I("substeps", Substeps);
+	GETSET_DATA_FUNCS_F("maxSpeed", MaxSpeed);
+	GETSET_DATA_FUNCS_F("maxAcceleration", MaxAcceleration);
+
 	GETSET_DATA_FUNCS_F("fluidRestDistanceMult", FluidRestDistanceMult);
+
 	GETSET_DATA_FUNCS_I("planesCount", PlanesCount);
+
 	GETSET_DATA_FUNCS_F("adhesion", Adhesion);
 	GETSET_DATA_FUNCS_F("cohesion", Cohesion);
 	GETSET_DATA_FUNCS_F("surfaceTension", SurfaceTension);
 	GETSET_DATA_FUNCS_F("viscosity", Viscosity);
+	GETSET_DATA_FUNCS_F("relaxationFactor", RelaxationFactor);
+	GETSET_DATA_FUNCS_F("solidPressure", SolidPressure);
+	GETSET_DATA_FUNCS_F("vorticityConfinement", VorticityConfinement);
+	GETSET_DATA_FUNCS_F("buoyancy", Buoyancy);
+
 	GETSET_DATA_FUNCS_F("dynamicfriction", DynamicFriction);
 	GETSET_DATA_FUNCS_F("staticfriction", StaticFriction);
+	GETSET_DATA_FUNCS_F("particleFriction", ParticleFriction);
+
+	GETSET_DATA_FUNCS_F("shapeCollisionMargin", ShapeCollisionMargin);
+	GETSET_DATA_FUNCS_F("particleCollisionMargin", ParticleCollisionMargin);
+	GETSET_DATA_FUNCS_F("collisionDistance", CollisionDistance);
 
 protected:
 	explicit SIM_NvFlexSolver(const SIM_DataFactory*fack);
@@ -44,3 +59,10 @@ private:
 	DECLARE_DATAFACTORY(SIM_NvFlexSolver, SIM_Solver, "solver for nvflex sim", getDescriptionForFucktory());
 };
 
+class NvFlexHContextAutoGetter {
+public:
+	NvFlexHContextAutoGetter(NvFlexLibrary*lib):_lib(lib) { NvFlexAcquireContext(lib); }
+	~NvFlexHContextAutoGetter() { NvFlexRestoreContext(_lib); }
+private:
+	NvFlexLibrary* _lib;
+};

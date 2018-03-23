@@ -7,6 +7,7 @@
 #include <SIM/SIM_ObjectArray.h>
 #include <SIM/SIM_Object.h>
 #include <SIM/SIM_GeometryCopy.h>
+#include <SIM/SIM_ForceGravity.h>
 #include <GU/GU_Detail.h>
 #include <PRM/PRM_Template.h>
 #include <PRM/PRM_Default.h>
@@ -25,6 +26,8 @@
 
 SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine & engine, SIM_ObjectArray & objs, SIM_ObjectArray & newobjs, SIM_ObjectArray & feedbackobjs, const SIM_Time & timestep)
 {
+	NvFlexHContextAutoGetter contextAutoGetAndRelease();
+
 	for (exint obji = 0; obji < objs.entries(); ++obji) {
 		SIM_Object* obj = objs(obji);
 
@@ -48,11 +51,12 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 					GA_ROHandleV3 vhnd(gdp->findPointAttribute("v"));
 					GA_ROHandleI ihnd(gdp->findPointAttribute("iid"));
 					GA_ROHandleI phshnd(gdp->findPointAttribute("phs"));
+					GA_ROHandleF mhnd(gdp->findPointAttribute("imass"));
 
 					int* indices = nvdata->_indices.get();
 					int nactives = NvFlexExtGetActiveList(consolv->container(), indices);
 
-					if (phnd.isValid() && vhnd.isValid() && ihnd.isValid() && phshnd.isValid()) {
+					if (phnd.isValid() && vhnd.isValid() && ihnd.isValid() && phshnd.isValid() && mhnd.isValid()) {
 						NvFlexExtParticleData pdat = NvFlexExtMapParticleData(consolv->container());
 
 						GA_Size ngdpoints = gdp->getNumPoints();
@@ -88,7 +92,7 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 								pdat.particles[iid4 + 0] = p.x();
 								pdat.particles[iid4 + 1] = p.y();
 								pdat.particles[iid4 + 2] = p.z();
-								pdat.particles[iid4 + 3] = 1.0f;
+								pdat.particles[iid4 + 3] = mhnd.get(off);
 
 								pdat.velocities[iid3 + 0] = v.x();
 								pdat.velocities[iid3 + 1] = v.y();
@@ -104,7 +108,40 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 						//Push NvFlex data to GPU. since it's async - we need to do it as far from the solver tick as possible to use this time to do CPU work
 						NvFlexExtPushToDevice(consolv->container()); //This pushes all from particle data returned by map. so collisions we can push separately.
 						//Also note that as long as we don't call anything with nvFlexExtAssets - we are free to rebind springs manually.
-						
+
+						GA_ROHandleF rlhnd(gdp->findPrimitiveAttribute("restlength"));
+						GA_ROHandleF sthnd(gdp->findPrimitiveAttribute("strength"));
+
+						if (rlhnd.isValid() && sthnd.isValid()) {
+							//This would be super not cool and not optimal to do. But in NvFlexVector capacity is never lowered, so it's safe and fast to resize down later
+							// as a downside - we always will have that extra memory allocated untill solver is resetted
+							consolv->resizeSpringData(gdp->getNumPrimitives());
+
+							auto sprdat = consolv->mapSpringData();
+							GA_Size springcount = 0; //TODO: replace with SYS_AtomicCounter in threaded implementation
+							for (GA_Iterator it(gdp->getPrimitiveRange()); !it.atEnd(); ++it) {
+								GA_Offset off = *it;
+								GA_Size vtxcount = gdp->getPrimitiveVertexCount(off);
+								if (vtxcount != 2)continue;
+								GA_OffsetListRef vtxs = gdp->getPrimitiveVertexList(off);
+								GA_Offset vt0 = vtxs(0);
+								GA_Offset vt1 = vtxs(1);
+
+								//TODO: check that if we hit pts limit - we dont write geo indices above the limit!!
+								//at this point indices should still be valid
+								sprdat.springIds[springcount * 2 + 0] = indices[gdp->pointIndex(gdp->vertexPoint(vt0))];
+								sprdat.springIds[springcount * 2 + 1] = indices[gdp->pointIndex(gdp->vertexPoint(vt1))];
+								sprdat.springRls[springcount] = rlhnd.get(off);
+								sprdat.springSts[springcount] = sthnd.get(off);
+
+								++springcount;
+							}
+							consolv->unmapSpringData();
+							//TODO: check that springcount is in int bounds and clamp it if needed!!
+							consolv->resizeSpringData((int)springcount);
+							
+						}
+						consolv->pushSpringsToDevice();
 					}
 
 				}
@@ -120,11 +157,12 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 		{
 			NvFlexHCollisionData* colldata = consolv->collisionData();
 			colldata->mapall();
+			/*
 			colldata->addSphere("test");
 			colldata->getSphere("test").collgeo->radius = 1.0f;
 			colldata->getSphere("test").position->y = 1.0f;
 			colldata->getSphere("test").prevposition->y = 1.0f;
-			
+			*/
 
 			//find collision relationships and build collisions
 			SIM_ConstObjectArray affs;
@@ -209,6 +247,21 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 		nvparams.numIterations = getIterations();
 		int substeps = getSubsteps();
 		updateSolverParams();
+		//Find and apply gravity
+		{
+			SIM_ConstDataArray gravities;
+			obj->filterConstSubData(gravities, 0, SIM_DataFilterByType("SIM_ForceGravity"), SIM_FORCES_DATANAME, SIM_DataFilterNone());
+			for (exint i = 0; i < gravities.entries(); ++i) {
+				const SIM_ForceGravity* force = SIM_DATA_CASTCONST(gravities(i), SIM_ForceGravity);
+				if (force == NULL)continue;
+				UT_Vector3 outForce, outTorque;
+				force->getForce(*obj, UT_Vector3(), UT_Vector3(), UT_Vector3(), 1.0f, outForce,outTorque);
+
+				nvparams.gravity[0] += outForce.x();
+				nvparams.gravity[1] += outForce.y();
+				nvparams.gravity[2] += outForce.z();
+			}
+		}
 		NvFlexSetParams(consolv->solver(), &nvparams);
 
 		NvFlexExtTickContainer(consolv->container(), timestep, substeps, false);
@@ -298,18 +351,19 @@ void SIM_NvFlexSolver::updateSolverParams() {
 	nvparams.radius = getRadius();
 
 	nvparams.gravity[0] = 0;
-	nvparams.gravity[1] = -9.8;
+	nvparams.gravity[1] = 0;
 	nvparams.gravity[2] = 0;
 	nvparams.fluidRestDistance = nvparams.radius * getFluidRestDistanceMult();
+	nvparams.solidRestDistance = nvparams.fluidRestDistance;
 	nvparams.numIterations = getIterations();
-	nvparams.maxSpeed = FLT_MAX;
-	nvparams.maxAcceleration = 1000.0f;
+	nvparams.maxSpeed = getMaxSpeed(); //FLT_MAX;
+	nvparams.maxAcceleration = getMaxAcceleration(); //1000.0f;
 	nvparams.fluid = true;
 
 	nvparams.viscosity = getViscosity();
 	nvparams.dynamicFriction = getDynamicFriction();
 	nvparams.staticFriction = getStaticFriction();
-	nvparams.particleFriction = 0.0f; // scale friction between particles by default
+	nvparams.particleFriction = getParticleFriction();//0.0f; // scale friction between particles by default
 	nvparams.freeSurfaceDrag = 0.0f;
 	nvparams.drag = 0.0f;
 	nvparams.lift = 0.0f;
@@ -327,17 +381,18 @@ void SIM_NvFlexSolver::updateSolverParams() {
 	nvparams.anisotropyMax = 2.0f;
 	nvparams.smoothing = 0.0f;
 
-	nvparams.shapeCollisionMargin = nvparams.radius * 0.5f;
-	nvparams.collisionDistance = nvparams.fluidRestDistance * 0.5f;
+	nvparams.shapeCollisionMargin = getShapeCollisionMargin();
+	nvparams.particleCollisionMargin = getParticleCollisionMargin();
+	nvparams.collisionDistance = getCollisionDistance();
 
 	nvparams.relaxationMode = eNvFlexRelaxationLocal;
-	nvparams.relaxationFactor = 1.0f;
-	nvparams.solidPressure = 1.0f;
+	nvparams.relaxationFactor = getRelaxationFactor();// 1.0f;
+	nvparams.solidPressure = getSolidPressure();// 0.1f;
 	nvparams.adhesion = getAdhesion();
 	nvparams.cohesion = getCohesion();
 	nvparams.surfaceTension = getSurfaceTension();
-	nvparams.vorticityConfinement = 0.0f;
-	nvparams.buoyancy = 1.0f;
+	nvparams.vorticityConfinement = getVorticityConfinement();// 0.0f;
+	nvparams.buoyancy = getBuoyancy();// 1.0f;
 }
 
 void SIM_NvFlexSolver::makeEqualSubclass(const SIM_Data * source)
@@ -359,43 +414,89 @@ const SIM_DopDescription* SIM_NvFlexSolver::getDescriptionForFucktory() {
 	static PRM_Name radius_name("radius", "Radius");
 	static PRM_Name iterations_name("iterations", "Constraint Iterations Count");
 	static PRM_Name substeps_name("substeps", "Substeps Count");
+	static PRM_Name maxSpeed_name("maxSpeed", "Maximum Particle Speed");
+	static PRM_Name maxAcceleration_name("maxAcceleration", "Maximum Particle Acceleration");
+
 	static PRM_Name fluidRestDistanceMult_name("fluidRestDistanceMult", "Rest Distance Multiplier");
 	static PRM_Name planesCount_name("planesCount", "Planes Count");
 	static PRM_Name adhesion_name("adhesion", "Adhesion");
 	static PRM_Name cohesion_name("cohesion", "Cohesion");
 	static PRM_Name surfaceTension_name("surfaceTension", "Surface Tension");
 	static PRM_Name viscosity_name("viscosity", "Viscosity");
+	static PRM_Name relaxationFactor_name("relaxationFactor", "Relaxation Factor");
+	static PRM_Name solidPressure_name("solidPressure", "Solid Pressure");
+	static PRM_Name vorticityConfinement_name("vorticityConfinement", "Vorticity Confinement");
+	static PRM_Name buoyancy_name("buoyancy", "Buoyancy");
+
 	static PRM_Name dynamicfriction_name("dynamicfriction", "Dynamic Friction");
 	static PRM_Name staticfriction_name("staticfriction", "Static Friction");
+	static PRM_Name particleFriction_name("particleFriction", "Particle Friction");
+
+	static PRM_Name shapeCollisionMargin_name("shapeCollisionMargin", "Shape Collision Margin");
+	static PRM_Name particleCollisionMargin_name("particleCollisionMargin", "Particle Collision Margin");
+	static PRM_Name collisionDistance_name("collisionDistance", "Collision Distance");
 	
+
 	static PRM_Default radius_default(0.1f);
 	static PRM_Default iterations_default(3);
 	static PRM_Default substeps_default(6);
+	static PRM_Default maxSpeed_default(FLT_MAX);
+	static PRM_Default maxAcceleration_default(1000.0f);
 	static PRM_Default fluidRestDistanceMult_defaults(0.55f);
 	static PRM_Default planesCount_defaults(5);
 	static PRM_Default adhesion_defaults(0.0f);
 	static PRM_Default cohesion_defaults(0.025f);
 	static PRM_Default surfaceTension_defaults(0.0f);
 	static PRM_Default viscosity_defaults(0.0f);
+	static PRM_Default relaxationFactor_default(1.0f);
+	static PRM_Default solidPressure_default(0.1f);
+	static PRM_Default vorticityConfinement_default(0.0f);
+	static PRM_Default buoyancy_default(1.0f);
+
 	static PRM_Default dynamicfriction_defaults(0.0f);
 	static PRM_Default staticfriction_defaults(0.0f);
+	static PRM_Default particleFriction_defaults(0.0f);
+	static PRM_Default shapeCollisionMargin_defaults(0.05f);
+	static PRM_Default particleCollisionMargin_defaults(0.0f);
+	static PRM_Default collisionDistance_defaults(0.0275f);
+
 
 	static PRM_Range iterations_range(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 16);
 	static PRM_Range substeps_range(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 16);
+	static PRM_Range maxSpeed_range(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, FLT_MAX);
+	static PRM_Range maxAcceleration_range(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1000);
 	static PRM_Range planesCount_range(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_RESTRICTED, 5);
+
+	static PRM_Range zeroOne_range(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1.0f);
+
+
 
 	static PRM_Template prms[] = {
 		PRM_Template(PRM_FLT, 1, &radius_name, &radius_default),
 		PRM_Template(PRM_INT, 1, &iterations_name, &iterations_default, 0, &iterations_range),
 		PRM_Template(PRM_INT, 1, &substeps_name, &substeps_default, 0, &substeps_range),
+		PRM_Template(PRM_FLT_LOG, 1, &maxSpeed_name, &maxSpeed_default, 0, &maxSpeed_range),
+		PRM_Template(PRM_FLT, 1, &maxAcceleration_name, &maxAcceleration_default, 0, &maxAcceleration_range),
+		PRM_SEPARATOR,
 		PRM_Template(PRM_FLT, 1, &fluidRestDistanceMult_name, &fluidRestDistanceMult_defaults),
 		PRM_Template(PRM_INT, 1, &planesCount_name,&planesCount_defaults,0,&planesCount_range),
+		PRM_SEPARATOR,
 		PRM_Template(PRM_FLT, 1, &adhesion_name, &adhesion_defaults),
 		PRM_Template(PRM_FLT, 1, &cohesion_name, &cohesion_defaults),
 		PRM_Template(PRM_FLT, 1, &surfaceTension_name, &surfaceTension_defaults),
 		PRM_Template(PRM_FLT, 1, &viscosity_name, &viscosity_defaults),
+		PRM_Template(PRM_FLT, 1, &relaxationFactor_name, &relaxationFactor_default),
+		PRM_Template(PRM_FLT, 1, &solidPressure_name, &solidPressure_default),
+		PRM_Template(PRM_FLT, 1, &vorticityConfinement_name, &vorticityConfinement_default),
+		PRM_Template(PRM_FLT, 1, &buoyancy_name, &buoyancy_default),
+		PRM_SEPARATOR,
 		PRM_Template(PRM_FLT, 1, &dynamicfriction_name, &dynamicfriction_defaults),
 		PRM_Template(PRM_FLT, 1, &staticfriction_name, &staticfriction_defaults),
+		PRM_Template(PRM_FLT, 1, &particleFriction_name, &particleFriction_defaults),
+		PRM_SEPARATOR,
+		PRM_Template(PRM_FLT, 1, &shapeCollisionMargin_name, &shapeCollisionMargin_defaults),
+		PRM_Template(PRM_FLT, 1, &particleCollisionMargin_name, &particleCollisionMargin_defaults),
+		PRM_Template(PRM_FLT, 1, &collisionDistance_name, &collisionDistance_defaults),
 		PRM_Template()
 	};
 
