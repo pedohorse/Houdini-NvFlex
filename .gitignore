@@ -1,2 +1,13 @@
+*
+!x64/
+!x64/Release/
+!x64/Release/nvFlexDop.dll*
+
+!nvFlexDop/
+!nvFlexDop/*
+!nvFlexDop/*/*
+!nvFlexDop/*/*/*
+!nvFlexDop/*/*/*/*
 **.vcxproj.user
-x64
+nvFlexDop/x64/
+
