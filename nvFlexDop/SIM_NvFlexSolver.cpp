@@ -33,6 +33,10 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 
 		SIM_NvFlexData* nvdata = SIM_DATA_GET(*obj, "NvFlexData", SIM_NvFlexData);
 		if (nvdata == NULL)continue;
+		if (!nvdata->isNvValid()) {
+			addError(obj, SIM_BADSUBDATA, "NvFlexData is in invalid state (maybe insufficient GPU resources). try resetting the simulation.", UT_ERROR_WARNING);
+			continue;
+		}
 		std::shared_ptr<SIM_NvFlexData::NvFlexContainerWrapper> consolv = nvdata->nvdata;
 
 

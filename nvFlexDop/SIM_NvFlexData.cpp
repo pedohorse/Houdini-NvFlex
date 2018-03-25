@@ -6,16 +6,23 @@ NvFlexLibrary* SIM_NvFlexData::nvFlexLibrary = NULL;
 
 static void CreateFluidParticleGrid(NvFlexExtParticleData& ptd, int* indices, Vec3 lower, int dimx, int dimy, int dimz, float radius, Vec3 velocity, float invMass, int phase, float jitter = 0.005f);
 
-static int ONCE = 0;
 
 void SIM_NvFlexData::initializeSubclass() {
 	SIM_Data::initializeSubclass();
 	_lastGdpPId = -1;
 
 	int ptsmaxcount = getMaxPtsCount();
-	nvdata.reset(new NvFlexContainerWrapper(SIM_NvFlexData::nvFlexLibrary, ptsmaxcount, 0));
-	_indices.reset(new int[ptsmaxcount]);
-
+	try {
+		nvdata.reset(new NvFlexContainerWrapper(SIM_NvFlexData::nvFlexLibrary, ptsmaxcount, 0));
+		_indices.reset(new int[ptsmaxcount]);
+	}
+	catch (...) {
+		std::cout << "nvflex data initialization failed!" << std::endl;
+		_valid = false;
+		nvdata.reset();
+		_indices.reset();
+		return;
+	}
 	std::cout << "nvflex data initialized" << std::endl;
 
 	//debug test
@@ -49,6 +56,11 @@ void SIM_NvFlexData::makeEqualSubclass(const SIM_Data* source) {
 	nvdata = src->nvdata;
 	_indices = src->_indices;
 	_lastGdpPId = src->_lastGdpPId;
+	_valid = _valid && src->_valid;
+	if (!_valid) {
+		nvdata.reset();
+		_indices.reset();
+	}
 }
 
 const SIM_DopDescription* SIM_NvFlexData::getDescriptionForFucktory() {
@@ -86,10 +98,11 @@ static void nvFlexErrorCallbackPrint(NvFlexErrorSeverity type, const char *msg, 
 }
 
 
-SIM_NvFlexData::SIM_NvFlexData(const SIM_DataFactory*fack):SIM_Data(fack),SIM_OptionsUser(this), _indices(nullptr_t(), std::default_delete<int[]>()), _lastGdpPId(-1){
+SIM_NvFlexData::SIM_NvFlexData(const SIM_DataFactory*fack):SIM_Data(fack),SIM_OptionsUser(this), _indices(nullptr_t(), std::default_delete<int[]>()), _lastGdpPId(-1), _valid(false){
 	if (nvFlexLibrary == NULL) {
 		nvFlexLibrary = NvFlexInit(110, &nvFlexErrorCallbackPrint);
 	}
+	if (nvFlexLibrary != NULL)_valid = true;
 }
 
 

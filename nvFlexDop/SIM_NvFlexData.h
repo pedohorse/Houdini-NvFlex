@@ -91,9 +91,11 @@ public:
 	
 	static NvFlexLibrary* nvFlexLibrary;
 
-	std::shared_ptr<NvFlexContainerWrapper> nvdata;
-
 	GETSET_DATA_FUNCS_I("maxpts", MaxPtsCount);
+
+	std::shared_ptr<NvFlexContainerWrapper> nvdata;
+public:
+	inline bool isNvValid() { return _valid; }
 
 protected:
 	explicit SIM_NvFlexData(const SIM_DataFactory*fack);
@@ -102,6 +104,8 @@ protected:
 	void initializeSubclass();
 	void makeEqualSubclass(const SIM_Data* source);
 
+private:
+	bool _valid;
 private: //for a friend
 	std::shared_ptr<int> _indices;
 	int64 _lastGdpPId;
