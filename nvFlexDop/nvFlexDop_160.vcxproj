@@ -25,7 +25,6 @@
     <ClInclude Include="SIM_NvFlexSolver.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\..\..\..\lib\flex\core\maths.cpp" />
     <ClCompile Include="entry.cpp" />
     <ClCompile Include="NvFlexHCollisionData.cpp" />
     <ClCompile Include="NvFlexHTriangleMesh.cpp" />
