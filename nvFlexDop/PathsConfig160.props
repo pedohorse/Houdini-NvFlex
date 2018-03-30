@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros">
+    <NvFlexPath>D:\lib\flex</NvFlexPath>
+    <HoudiniPath>C:\Program Files\Side Effects Software\Houdini 16.0.600</HoudiniPath>
+  </PropertyGroup>
+  <PropertyGroup>
+    <_PropertySheetDisplayName>PathsConfig160</_PropertySheetDisplayName>
+  </PropertyGroup>
+  <ItemDefinitionGroup />
+  <ItemGroup>
+    <BuildMacro Include="NvFlexPath">
+      <Value>$(NvFlexPath)</Value>
+    </BuildMacro>
+    <BuildMacro Include="HoudiniPath">
+      <Value>$(HoudiniPath)</Value>
+    </BuildMacro>
+  </ItemGroup>
+</Project>
