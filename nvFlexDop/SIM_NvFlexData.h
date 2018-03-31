@@ -21,71 +21,109 @@ public:
 	class NvFlexContainerWrapper {
 	public:
 		typedef struct NvFlexHSpringData {
-			int* springIds;
-			float* springRls;
-			float* springSts;
+			int* const springIds;
+			float* const springRls;
+			float* const springSts;
 
 			NvFlexHSpringData(int*sid, float*srl, float*sts):springIds(sid),springRls(srl),springSts(sts){}
 		} NvFlexHSpringData;
 
-		explicit NvFlexContainerWrapper(NvFlexLibrary*lib, int maxParticles, int MaxDiffuseParticles, int maxNeighbours = 96):springIndices(lib),springRestLengths(lib),springStrenghts(lib) {
-			slv = NvFlexCreateSolver(lib, maxParticles, MaxDiffuseParticles, maxNeighbours);
-			if (slv == NULL)throw std::runtime_error("NULL NVFLEX SOLVER!");
-			cont = NvFlexExtCreateContainer(lib, slv, maxParticles);
-			if (cont == NULL)throw std::runtime_error("NULL NVFLEX CONTAINER!");
-			colld = new NvFlexHCollisionData(lib);
+		typedef struct NvFlexHTriangleData {
+			int* const triangleIds;
+			float* const triangleNms;
+
+			NvFlexHTriangleData(int*tid, float*tnm):triangleIds(tid),triangleNms(tnm){}
+		} NvFlexHTriangleData;
+
+		explicit NvFlexContainerWrapper(NvFlexLibrary*lib, int maxParticles, int MaxDiffuseParticles, int maxNeighbours = 96):_springIndices(lib),_springRestLengths(lib),_springStrenghts(lib), _triangleIndices(lib),_triangleNormals(lib){
+			_slv = NvFlexCreateSolver(lib, maxParticles, MaxDiffuseParticles, maxNeighbours);
+			if (_slv == NULL)throw std::runtime_error("NULL NVFLEX SOLVER!");
+			_cont = NvFlexExtCreateContainer(lib, _slv, maxParticles);
+			if (_cont == NULL)throw std::runtime_error("NULL NVFLEX CONTAINER!");
+			_colld = new NvFlexHCollisionData(lib);
 		}
 		NvFlexContainerWrapper(NvFlexContainerWrapper&) = delete;
 		~NvFlexContainerWrapper() {
-			NvFlexExtDestroyContainer(cont);
-			NvFlexDestroySolver(slv);
-			delete colld;
+			NvFlexExtDestroyContainer(_cont);
+			NvFlexDestroySolver(_slv);
+			delete _colld;
 		}
 
-		NvFlexSolver* solver() { return slv; }
-		NvFlexExtContainer * container() { return cont; }
-		NvFlexHCollisionData* collisionData() { return colld; }
+		NvFlexSolver* solver() { return _slv; }
+		NvFlexExtContainer * container() { return _cont; }
+		NvFlexHCollisionData* collisionData() { return _colld; }
 
 		//springs
-		int getSpringDataSize()const { return springRestLengths.size(); }
+		int getSpringsCount()const { return _springRestLengths.size(); }
 		void resizeSpringData(int newSize) {
 			/// be sure data is NOT MAPPED before here
 			/// cuz all previous pointers will be invalidated
-			springIndices.map();
-			springRestLengths.map();
-			springStrenghts.map();
+			_springIndices.map();
+			_springRestLengths.map();
+			_springStrenghts.map();
 
-			springIndices.resize(2*newSize);
-			springRestLengths.resize(newSize);
-			springStrenghts.resize(newSize);
+			_springIndices.resize(2*newSize);
+			_springRestLengths.resize(newSize);
+			_springStrenghts.resize(newSize);
 
-			springIndices.unmap();
-			springRestLengths.unmap();
-			springStrenghts.unmap();
+			_springIndices.unmap();
+			_springRestLengths.unmap();
+			_springStrenghts.unmap();
 		}
 		NvFlexHSpringData mapSpringData(){
-			springIndices.map();
-			springRestLengths.map();
-			springStrenghts.map();
-			return NvFlexHSpringData(springIndices.mappedPtr, springRestLengths.mappedPtr, springStrenghts.mappedPtr);
+			_springIndices.map();
+			_springRestLengths.map();
+			_springStrenghts.map();
+			return NvFlexHSpringData(_springIndices.mappedPtr, _springRestLengths.mappedPtr, _springStrenghts.mappedPtr);
 		}
 		void unmapSpringData() {
-			springIndices.unmap();
-			springRestLengths.unmap();
-			springStrenghts.unmap();
+			_springIndices.unmap();
+			_springRestLengths.unmap();
+			_springStrenghts.unmap();
 		}
 		void pushSpringsToDevice() {
-			NvFlexSetSprings(slv, springIndices.buffer, springRestLengths.buffer, springStrenghts.buffer, springRestLengths.size());
+			NvFlexSetSprings(_slv, _springIndices.buffer, _springRestLengths.buffer, _springStrenghts.buffer, _springRestLengths.size());
 		}
+
+		//triangles
+		int getTrianglesCount()const { return _triangleIndices.size() / 3; }
+		void resizeTriangleData(int newSize) {
+			/// be sure data is NOT MAPPED before here
+			/// cuz all previous pointers will be invalidated
+			_triangleIndices.map();
+			_triangleNormals.map();
+
+			_triangleIndices.resize(3*newSize);
+			_triangleNormals.resize(3*newSize);
+
+			_triangleIndices.unmap();
+			_triangleNormals.unmap();
+		}
+		NvFlexHTriangleData mapTriangleData() {
+			_triangleIndices.map();
+			_triangleNormals.map();
+			return NvFlexHTriangleData(_triangleIndices.mappedPtr, _triangleNormals.mappedPtr);
+		}
+		void unmapTriangleData() {
+			_triangleIndices.unmap();
+			_triangleNormals.unmap();
+		}
+		void pushTrianglesToDevice(bool pushNormals = true) {
+			NvFlexSetDynamicTriangles(_slv, _triangleIndices.buffer, pushNormals ? _triangleNormals.buffer : NULL, _triangleIndices.size() / 3);
+		}
+
 	private:
-		NvFlexHCollisionData* colld;
-		NvFlexSolver* slv;
-		NvFlexExtContainer* cont;
+		NvFlexHCollisionData* _colld;
+		NvFlexSolver* _slv;
+		NvFlexExtContainer* _cont;
 
 		//springs
-		NvFlexVector<int> springIndices;
-		NvFlexVector<float> springRestLengths;
-		NvFlexVector<float> springStrenghts;
+		NvFlexVector<int> _springIndices;
+		NvFlexVector<float> _springRestLengths;
+		NvFlexVector<float> _springStrenghts;
+		//triangles
+		NvFlexVector<int> _triangleIndices;
+		NvFlexVector<float> _triangleNormals;
 	};
 
 	

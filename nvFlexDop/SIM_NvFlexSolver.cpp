@@ -56,6 +56,8 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 					GA_ROHandleI ihnd(gdp->findPointAttribute("iid"));
 					GA_ROHandleI phshnd(gdp->findPointAttribute("phs"));
 					GA_ROHandleF mhnd(gdp->findPointAttribute("imass"));
+					GA_ROHandleV3 rhnd(gdp->findPointAttribute("restP"));
+					const bool hasRest = rhnd.isValid();
 
 					int* indices = nvdata->_indices.get();
 					int nactives = NvFlexExtGetActiveList(consolv->container(), indices);
@@ -97,6 +99,13 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 								pdat.particles[iid4 + 1] = p.y();
 								pdat.particles[iid4 + 2] = p.z();
 								pdat.particles[iid4 + 3] = mhnd.get(off);
+								if (hasRest) {
+									UT_Vector3F rst = rhnd.get(off);
+									pdat.restParticles[iid4 + 0] = rst.x();
+									pdat.restParticles[iid4 + 1] = rst.y();
+									pdat.restParticles[iid4 + 2] = rst.z();
+									pdat.restParticles[iid4 + 3] = 1.0f; //cannot find in manual what it expects here
+								}
 
 								pdat.velocities[iid3 + 0] = v.x();
 								pdat.velocities[iid3 + 1] = v.y();
@@ -110,42 +119,98 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 						NvFlexExtUnmapParticleData(consolv->container());
 
 						//Push NvFlex data to GPU. since it's async - we need to do it as far from the solver tick as possible to use this time to do CPU work
-						NvFlexExtPushToDevice(consolv->container()); //This pushes all from particle data returned by map. so collisions we can push separately.
+						NvFlexExtPushToDevice(consolv->container()); //This pushes all from particle data returned by map. so collisions, springs and triangles we can push separately.
 						//Also note that as long as we don't call anything with nvFlexExtAssets - we are free to rebind springs manually.
 
-						GA_ROHandleF rlhnd(gdp->findPrimitiveAttribute("restlength"));
-						GA_ROHandleF sthnd(gdp->findPrimitiveAttribute("strength"));
+						GA_Size nprims = gdp->getNumPrimitives();
+						if(nprims>0){//Create and Push SPRINGS and TRIANGLES
+							GA_ROHandleF rlhnd(gdp->findPrimitiveAttribute("restlength"));
+							GA_ROHandleF sthnd(gdp->findPrimitiveAttribute("strength"));
+							GA_ROHandleV3 nphnd(gdp->findPointAttribute("N"));
+							GA_ROHandleV3 nvhnd(gdp->findVertexAttribute("N"));
+							GA_ROHandleV3 nrhnd(gdp->findPrimitiveAttribute("N"));
+							const short triNormalType = nrhnd.isValid() ? 3 : (nvhnd.isValid() ? 2 : (nphnd.isValid() ? 1 : 0));
 
-						if (rlhnd.isValid() && sthnd.isValid()) {
-							//This would be super not cool and not optimal to do. But in NvFlexVector capacity is never lowered, so it's safe and fast to resize down later
-							// as a downside - we always will have that extra memory allocated untill solver is resetted
-							consolv->resizeSpringData(gdp->getNumPrimitives());
 
-							auto sprdat = consolv->mapSpringData();
-							GA_Size springcount = 0; //TODO: replace with SYS_AtomicCounter in threaded implementation
-							for (GA_Iterator it(gdp->getPrimitiveRange()); !it.atEnd(); ++it) {
-								GA_Offset off = *it;
-								GA_Size vtxcount = gdp->getPrimitiveVertexCount(off);
-								if (vtxcount != 2)continue;
-								GA_OffsetListRef vtxs = gdp->getPrimitiveVertexList(off);
-								GA_Offset vt0 = vtxs(0);
-								GA_Offset vt1 = vtxs(1);
+							if (rlhnd.isValid() && sthnd.isValid()) {
+								//This would be super not cool and not optimal to do. But in NvFlexVector capacity is never lowered, so it's safe and fast to resize down later
+								// as a downside - we always will have that extra memory allocated untill solver is resetted
+								consolv->resizeSpringData(nprims);
+								consolv->resizeTriangleData(nprims); //TODO: count properly, dont waste memory like this!
 
-								//TODO: check that if we hit pts limit - we dont write geo indices above the limit!!
-								//at this point indices should still be valid
-								sprdat.springIds[springcount * 2 + 0] = indices[gdp->pointIndex(gdp->vertexPoint(vt0))];
-								sprdat.springIds[springcount * 2 + 1] = indices[gdp->pointIndex(gdp->vertexPoint(vt1))];
-								sprdat.springRls[springcount] = rlhnd.get(off);
-								sprdat.springSts[springcount] = sthnd.get(off);
+								auto sprdat = consolv->mapSpringData();
+								auto tridat = consolv->mapTriangleData();
+								GA_Size springcount = 0; //TODO: replace with SYS_AtomicCounter in threaded implementation
+								GA_Size trianglecount = 0;
+								for (GA_Iterator it(gdp->getPrimitiveRange()); !it.atEnd(); ++it) {
+									GA_Offset off = *it;
+									GA_Size vtxcount = gdp->getPrimitiveVertexCount(off);
+									if (vtxcount == 2) {
+										GA_OffsetListRef vtxs = gdp->getPrimitiveVertexList(off);
+										GA_Offset vt0 = vtxs(0);
+										GA_Offset vt1 = vtxs(1);
 
-								++springcount;
+										//TODO: check that if we hit pts limit - we dont write geo indices above the limit!!
+										//at this point indices should still be valid
+										sprdat.springIds[springcount * 2 + 0] = indices[gdp->pointIndex(gdp->vertexPoint(vt0))];
+										sprdat.springIds[springcount * 2 + 1] = indices[gdp->pointIndex(gdp->vertexPoint(vt1))];
+										sprdat.springRls[springcount] = rlhnd.get(off);
+										sprdat.springSts[springcount] = sthnd.get(off);
+
+										++springcount;
+									}
+									else if (vtxcount == 3) {
+										GA_OffsetListRef vtxs = gdp->getPrimitiveVertexList(off);
+										GA_Offset vt0 = vtxs(0);
+										GA_Offset vt1 = vtxs(1);
+										GA_Offset vt2 = vtxs(2);
+
+										GA_Offset pt0 = gdp->vertexPoint(vt0);
+										GA_Offset pt1 = gdp->vertexPoint(vt1);
+										GA_Offset pt2 = gdp->vertexPoint(vt2);
+
+										GA_Size tricnt3 = trianglecount * 3;
+										tridat.triangleIds[tricnt3 + 0] = indices[gdp->pointIndex(pt0)];
+										tridat.triangleIds[tricnt3 + 1] = indices[gdp->pointIndex(pt1)];
+										tridat.triangleIds[tricnt3 + 2] = indices[gdp->pointIndex(pt2)];
+
+										if (triNormalType > 0) {
+											UT_Vector3F n;
+											if (triNormalType == 1) {
+												n = nphnd.get(pt0);
+												n += nphnd.get(pt1);
+												n += nphnd.get(pt2);
+												n.normalize();
+											}
+											else if (triNormalType == 2) {
+												n = nvhnd.get(vt0);
+												n += nvhnd.get(vt1);
+												n += nvhnd.get(vt2);
+												n.normalize();
+											}
+											else if (triNormalType == 3) {
+												n = nrhnd.get(off);
+											}
+											tridat.triangleNms[tricnt3 + 0] = n.x();
+											tridat.triangleNms[tricnt3 + 1] = n.y();
+											tridat.triangleNms[tricnt3 + 2] = n.z();
+										}
+
+										++trianglecount;
+									}
+								}
+								consolv->unmapSpringData();
+								consolv->unmapTriangleData();
+								//TODO: check that springcount is in int bounds and clamp it if needed!!
+								consolv->resizeSpringData((int)springcount);
+								consolv->resizeTriangleData((int)trianglecount);
+
+
 							}
-							consolv->unmapSpringData();
-							//TODO: check that springcount is in int bounds and clamp it if needed!!
-							consolv->resizeSpringData((int)springcount);
-							
-						}
-						consolv->pushSpringsToDevice();
+							consolv->pushSpringsToDevice();//Note that we should do this only if change occured in springs. for now we do not detect those changes, so we push always.
+							consolv->pushTrianglesToDevice(triNormalType > 0);
+						}//END SPRINGS AND TRIANGLES
+
 					}
 
 				}
@@ -369,8 +434,8 @@ void SIM_NvFlexSolver::updateSolverParams() {
 	nvparams.staticFriction = getStaticFriction();
 	nvparams.particleFriction = getParticleFriction();//0.0f; // scale friction between particles by default
 	nvparams.freeSurfaceDrag = 0.0f;
-	nvparams.drag = 0.0f;
-	nvparams.lift = 0.0f;
+	nvparams.drag = getDrag();// 0.0f;
+	nvparams.lift = getLift();// 0.0f;
 
 	nvparams.numPlanes = getPlanesCount();
 	(Vec4&)nvparams.planes[0] = Vec4(0.0f, 1.0f, 0.0f, 0.0f);
@@ -435,6 +500,8 @@ const SIM_DopDescription* SIM_NvFlexSolver::getDescriptionForFucktory() {
 	static PRM_Name dynamicfriction_name("dynamicfriction", "Dynamic Friction");
 	static PRM_Name staticfriction_name("staticfriction", "Static Friction");
 	static PRM_Name particleFriction_name("particleFriction", "Particle Friction");
+	static PRM_Name drag_name("drag", "Cloth Drag");
+	static PRM_Name lift_name("lift", "Cloth Lift");
 
 	static PRM_Name shapeCollisionMargin_name("shapeCollisionMargin", "Shape Collision Margin");
 	static PRM_Name particleCollisionMargin_name("particleCollisionMargin", "Particle Collision Margin");
@@ -464,6 +531,7 @@ const SIM_DopDescription* SIM_NvFlexSolver::getDescriptionForFucktory() {
 	static PRM_Default particleCollisionMargin_defaults(0.0f);
 	static PRM_Default collisionDistance_defaults(0.0275f);
 
+	static PRM_Default zero_defaults(0.0f);
 
 	static PRM_Range iterations_range(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 16);
 	static PRM_Range substeps_range(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 16);
@@ -474,6 +542,12 @@ const SIM_DopDescription* SIM_NvFlexSolver::getDescriptionForFucktory() {
 	static PRM_Range zeroOne_range(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1.0f);
 
 
+	//seps
+	static PRM_Name sep0("sep0", "sep0");
+	static PRM_Name sep1("sep1", "sep1");
+	static PRM_Name sep2("sep2", "sep2");
+	static PRM_Name sep3("sep3", "sep3");
+	//endseps
 
 	static PRM_Template prms[] = {
 		PRM_Template(PRM_FLT, 1, &radius_name, &radius_default),
@@ -481,10 +555,10 @@ const SIM_DopDescription* SIM_NvFlexSolver::getDescriptionForFucktory() {
 		PRM_Template(PRM_INT, 1, &substeps_name, &substeps_default, 0, &substeps_range),
 		PRM_Template(PRM_FLT_LOG, 1, &maxSpeed_name, &maxSpeed_default, 0, &maxSpeed_range),
 		PRM_Template(PRM_FLT, 1, &maxAcceleration_name, &maxAcceleration_default, 0, &maxAcceleration_range),
-		PRM_SEPARATOR,
+		PRM_Template(PRM_SEPARATOR, 1, &sep0),
 		PRM_Template(PRM_FLT, 1, &fluidRestDistanceMult_name, &fluidRestDistanceMult_defaults),
 		PRM_Template(PRM_INT, 1, &planesCount_name,&planesCount_defaults,0,&planesCount_range),
-		PRM_SEPARATOR,
+		PRM_Template(PRM_SEPARATOR, 1, &sep1),
 		PRM_Template(PRM_FLT, 1, &adhesion_name, &adhesion_defaults),
 		PRM_Template(PRM_FLT, 1, &cohesion_name, &cohesion_defaults),
 		PRM_Template(PRM_FLT, 1, &surfaceTension_name, &surfaceTension_defaults),
@@ -493,11 +567,13 @@ const SIM_DopDescription* SIM_NvFlexSolver::getDescriptionForFucktory() {
 		PRM_Template(PRM_FLT, 1, &solidPressure_name, &solidPressure_default),
 		PRM_Template(PRM_FLT, 1, &vorticityConfinement_name, &vorticityConfinement_default),
 		PRM_Template(PRM_FLT, 1, &buoyancy_name, &buoyancy_default),
-		PRM_SEPARATOR,
+		PRM_Template(PRM_SEPARATOR, 1, &sep2),
 		PRM_Template(PRM_FLT, 1, &dynamicfriction_name, &dynamicfriction_defaults),
 		PRM_Template(PRM_FLT, 1, &staticfriction_name, &staticfriction_defaults),
 		PRM_Template(PRM_FLT, 1, &particleFriction_name, &particleFriction_defaults),
-		PRM_SEPARATOR,
+		PRM_Template(PRM_FLT, 1, &drag_name, &zero_defaults, 0, &zeroOne_range),
+		PRM_Template(PRM_FLT, 1, &lift_name, &zero_defaults, 0, &zeroOne_range),
+		PRM_Template(PRM_SEPARATOR, 1, &sep3),
 		PRM_Template(PRM_FLT, 1, &shapeCollisionMargin_name, &shapeCollisionMargin_defaults),
 		PRM_Template(PRM_FLT, 1, &particleCollisionMargin_name, &particleCollisionMargin_defaults),
 		PRM_Template(PRM_FLT, 1, &collisionDistance_name, &collisionDistance_defaults),

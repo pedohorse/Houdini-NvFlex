@@ -35,6 +35,8 @@ public:
 	GETSET_DATA_FUNCS_F("dynamicfriction", DynamicFriction);
 	GETSET_DATA_FUNCS_F("staticfriction", StaticFriction);
 	GETSET_DATA_FUNCS_F("particleFriction", ParticleFriction);
+	GETSET_DATA_FUNCS_F("drag", Drag);
+	GETSET_DATA_FUNCS_F("lift", Lift);
 
 	GETSET_DATA_FUNCS_F("shapeCollisionMargin", ShapeCollisionMargin);
 	GETSET_DATA_FUNCS_F("particleCollisionMargin", ParticleCollisionMargin);
