@@ -23,7 +23,7 @@ void SIM_NvFlexData::initializeSubclass() {
 		_indices.reset();
 		return;
 	}
-	std::cout << "nvflex data initialized" << std::endl;
+	std::cout << "nvflex data initialized with " << ptsmaxcount << std::endl;
 
 	//debug test
 	/*float sizex = 1.76f;
@@ -101,12 +101,16 @@ static void nvFlexErrorCallbackPrint(NvFlexErrorSeverity type, const char *msg, 
 SIM_NvFlexData::SIM_NvFlexData(const SIM_DataFactory*fack):SIM_Data(fack),SIM_OptionsUser(this), _indices(nullptr_t(), std::default_delete<int[]>()), _lastGdpPId(-1), _valid(false){
 	if (nvFlexLibrary == NULL) {
 		nvFlexLibrary = NvFlexInit(110, &nvFlexErrorCallbackPrint);
+		std::cout << "flex library initialized" << std::endl;
 	}
 	if (nvFlexLibrary != NULL)_valid = true;
+	std::cout << "flex data constructed" << std::endl;
 }
 
 
-SIM_NvFlexData::~SIM_NvFlexData(){}
+SIM_NvFlexData::~SIM_NvFlexData(){
+	std::cout << "flex data destructed" << std::endl;
+}
 
 
 
