@@ -11,6 +11,9 @@
 !nvFlexDop/*/*/*
 !nvFlexDop/*/*/*/*
 
+!examples
+!examples/*
+
 **.vcxproj.user
 nvFlexDop/x64/
 
