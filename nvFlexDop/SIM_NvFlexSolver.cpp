@@ -462,6 +462,12 @@ void SIM_NvFlexSolver::updateSolverParams() {
 	nvparams.surfaceTension = getSurfaceTension();
 	nvparams.vorticityConfinement = getVorticityConfinement();// 0.0f;
 	nvparams.buoyancy = getBuoyancy();// 1.0f;
+
+
+	UT_Vector3F wind = getWind();
+	nvparams.wind[0] = wind.x();
+	nvparams.wind[1] = wind.y();
+	nvparams.wind[2] = wind.z();
 }
 
 void SIM_NvFlexSolver::makeEqualSubclass(const SIM_Data * source)
@@ -502,6 +508,7 @@ const SIM_DopDescription* SIM_NvFlexSolver::getDescriptionForFucktory() {
 	static PRM_Name particleFriction_name("particleFriction", "Particle Friction");
 	static PRM_Name drag_name("drag", "Cloth Drag");
 	static PRM_Name lift_name("lift", "Cloth Lift");
+	static PRM_Name wind_name("wind", "Wind");
 
 	static PRM_Name shapeCollisionMargin_name("shapeCollisionMargin", "Shape Collision Margin");
 	static PRM_Name particleCollisionMargin_name("particleCollisionMargin", "Particle Collision Margin");
@@ -573,6 +580,7 @@ const SIM_DopDescription* SIM_NvFlexSolver::getDescriptionForFucktory() {
 		PRM_Template(PRM_FLT, 1, &particleFriction_name, &particleFriction_defaults),
 		PRM_Template(PRM_FLT, 1, &drag_name, &zero_defaults, 0, &zeroOne_range),
 		PRM_Template(PRM_FLT, 1, &lift_name, &zero_defaults, 0, &zeroOne_range),
+		PRM_Template(PRM_FLT, 3, &wind_name, 0),
 		PRM_Template(PRM_SEPARATOR, 1, &sep3),
 		PRM_Template(PRM_FLT, 1, &shapeCollisionMargin_name, &shapeCollisionMargin_defaults),
 		PRM_Template(PRM_FLT, 1, &particleCollisionMargin_name, &particleCollisionMargin_defaults),

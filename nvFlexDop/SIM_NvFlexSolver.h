@@ -42,6 +42,8 @@ public:
 	GETSET_DATA_FUNCS_F("particleCollisionMargin", ParticleCollisionMargin);
 	GETSET_DATA_FUNCS_F("collisionDistance", CollisionDistance);
 
+	GETSET_DATA_FUNCS_V3("wind", Wind);
+
 protected:
 	explicit SIM_NvFlexSolver(const SIM_DataFactory*fack);
 	virtual ~SIM_NvFlexSolver();
