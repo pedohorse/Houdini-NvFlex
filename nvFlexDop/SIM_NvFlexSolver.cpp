@@ -50,6 +50,8 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 				std::cout << "id = " << ndid << std::endl;
 				if (ndid != nvdata->_lastGdpPId) {
 					std::cout << "found geo, new id !! old id "<< nvdata->_lastGdpPId << std::endl;
+					
+					//we just search for attribs, not creating them cuz for now we work with RO geometry
 
 					GA_ROHandleV3 phnd(gdp->getP());
 					GA_ROHandleV3 vhnd(gdp->findPointAttribute("v"));
@@ -63,7 +65,6 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 					int nactives = NvFlexExtGetActiveList(consolv->container(), indices);
 
 					if (phnd.isValid() && vhnd.isValid() && ihnd.isValid() && phshnd.isValid() && mhnd.isValid()) {
-						NvFlexExtParticleData pdat = NvFlexExtMapParticleData(consolv->container());
 
 						GA_Size ngdpoints = gdp->getNumPoints();
 						bool reget = false;
@@ -79,6 +80,8 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 							reget = true;
 						}
 						if (reget) nactives = NvFlexExtGetActiveList(consolv->container(), indices);
+
+						NvFlexExtParticleData pdat = NvFlexExtMapParticleData(consolv->container());
 
 						GA_Offset bst, bed;
 						bool stoploop = false;
@@ -123,93 +126,160 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 						//Also note that as long as we don't call anything with nvFlexExtAssets - we are free to rebind springs manually.
 
 						GA_Size nprims = gdp->getNumPrimitives();
-						if(nprims>0){//Create and Push SPRINGS and TRIANGLES
+						if(nprims>0){//Create and Push SPRINGS and TRIANGLES and RIGIDS
 							GA_ROHandleF rlhnd(gdp->findPrimitiveAttribute("restlength"));
 							GA_ROHandleF sthnd(gdp->findPrimitiveAttribute("strength"));
+							//--
 							GA_ROHandleV3 nphnd(gdp->findPointAttribute("N"));
 							GA_ROHandleV3 nvhnd(gdp->findVertexAttribute("N"));
 							GA_ROHandleV3 nrhnd(gdp->findPrimitiveAttribute("N"));
 							const short triNormalType = nrhnd.isValid() ? 3 : (nvhnd.isValid() ? 2 : (nphnd.isValid() ? 1 : 0));
+							//--
+							GA_ROHandleV3 prtrshnd(gdp->findPrimitiveAttribute("rgd_translation"));
+							GA_ROHandleV4 prrothnd(gdp->findPrimitiveAttribute("rgd_rotation"));
+							GA_ROHandleV3 vrrsphnd(gdp->findVertexAttribute("rgd_restP"));
+							GA_ROHandleV3 vrrsnhnd(gdp->findVertexAttribute("rgd_restN"));
+							GA_ROHandleF vrsdfhnd(gdp->findVertexAttribute("rgd_sdf"));
+							GA_ROHandleF prstfhnd(gdp->findPrimitiveAttribute("rgd_stiffness"));
+							GA_ROHandleI  prgdhnd(gdp->findPrimitiveAttribute("rgd_isrigid"));
 
-
-							if (rlhnd.isValid() && sthnd.isValid()) {
-								//This would be super not cool and not optimal to do. But in NvFlexVector capacity is never lowered, so it's safe and fast to resize down later
-								// as a downside - we always will have that extra memory allocated untill solver is resetted
-								consolv->resizeSpringData(nprims);
-								consolv->resizeTriangleData(nprims); //TODO: count properly, dont waste memory like this!
-
-								auto sprdat = consolv->mapSpringData();
-								auto tridat = consolv->mapTriangleData();
-								GA_Size springcount = 0; //TODO: replace with SYS_AtomicCounter in threaded implementation
-								GA_Size trianglecount = 0;
+							
+							const bool doSprings = rlhnd.isValid() && sthnd.isValid();
+							const bool doTriangles = true;
+							const bool doRigids = prtrshnd.isValid() && prrothnd.isValid() && vrrsphnd.isValid() && vrrsnhnd.isValid() && vrsdfhnd.isValid() && prstfhnd.isValid() && prgdhnd.isValid();
+							if (doSprings || doTriangles || doRigids) {
+								//calculate primitives of different types
+								GA_Size totalspringcount = 0;
+								GA_Size totaltricount = 0;
+								GA_Size totalrigidcount = 0;
+								std::vector<int> rgdPrimSizes;
+								rgdPrimSizes.reserve(nprims);//reserve size of total prim count. not particulary good, but it's main RAM and we can assume we have an ass load of it.
 								for (GA_Iterator it(gdp->getPrimitiveRange()); !it.atEnd(); ++it) {
 									GA_Offset off = *it;
 									GA_Size vtxcount = gdp->getPrimitiveVertexCount(off);
-									if (vtxcount == 2) {
-										GA_OffsetListRef vtxs = gdp->getPrimitiveVertexList(off);
-										GA_Offset vt0 = vtxs(0);
-										GA_Offset vt1 = vtxs(1);
-
-										//TODO: check that if we hit pts limit - we dont write geo indices above the limit!!
-										//at this point indices should still be valid
-										sprdat.springIds[springcount * 2 + 0] = indices[gdp->pointIndex(gdp->vertexPoint(vt0))];
-										sprdat.springIds[springcount * 2 + 1] = indices[gdp->pointIndex(gdp->vertexPoint(vt1))];
-										sprdat.springRls[springcount] = rlhnd.get(off);
-										sprdat.springSts[springcount] = sthnd.get(off);
-
-										++springcount;
-									}
-									else if (vtxcount == 3) {
-										GA_OffsetListRef vtxs = gdp->getPrimitiveVertexList(off);
-										GA_Offset vt0 = vtxs(0);
-										GA_Offset vt1 = vtxs(1);
-										GA_Offset vt2 = vtxs(2);
-
-										GA_Offset pt0 = gdp->vertexPoint(vt0);
-										GA_Offset pt1 = gdp->vertexPoint(vt1);
-										GA_Offset pt2 = gdp->vertexPoint(vt2);
-
-										GA_Size tricnt3 = trianglecount * 3;
-										tridat.triangleIds[tricnt3 + 0] = indices[gdp->pointIndex(pt0)];
-										tridat.triangleIds[tricnt3 + 1] = indices[gdp->pointIndex(pt1)];
-										tridat.triangleIds[tricnt3 + 2] = indices[gdp->pointIndex(pt2)];
-
-										if (triNormalType > 0) {
-											UT_Vector3F n;
-											if (triNormalType == 1) {
-												n = nphnd.get(pt0);
-												n += nphnd.get(pt1);
-												n += nphnd.get(pt2);
-												n.normalize();
-											}
-											else if (triNormalType == 2) {
-												n = nvhnd.get(vt0);
-												n += nvhnd.get(vt1);
-												n += nvhnd.get(vt2);
-												n.normalize();
-											}
-											else if (triNormalType == 3) {
-												n = nrhnd.get(off);
-											}
-											tridat.triangleNms[tricnt3 + 0] = n.x();
-											tridat.triangleNms[tricnt3 + 1] = n.y();
-											tridat.triangleNms[tricnt3 + 2] = n.z();
-										}
-
-										++trianglecount;
+									const bool isRigid = prgdhnd.isValid() && prgdhnd.get(off);
+									if (isRigid) {
+										++totalrigidcount;
+										rgdPrimSizes.push_back(vtxcount);
+									} else {
+										if (vtxcount == 2)++totalspringcount;
+										else if (vtxcount == 3)++totaltricount;
 									}
 								}
+								consolv->resizeSpringData(totalspringcount);
+								consolv->resizeTriangleData(totaltricount);
+								consolv->resizeRigidData(totalrigidcount, rgdPrimSizes);
+
+								auto sprdat = consolv->mapSpringData();
+								auto tridat = consolv->mapTriangleData();
+								auto rgddat = consolv->mapRigidData();
+								GA_Size springcount = 0; //TODO: replace with SYS_AtomicCounter in threaded implementation
+								GA_Size trianglecount = 0;
+								GA_Size rgdcount = 0;
+								GA_Size rgdindoff = 0;
+								for (GA_Iterator it(gdp->getPrimitiveRange()); !it.atEnd(); ++it) {
+									GA_Offset off = *it;
+									GA_Size vtxcount = gdp->getPrimitiveVertexCount(off);
+									const bool isRigid = prgdhnd.isValid() && prgdhnd.get(off);
+									if (isRigid) {
+										rgddat.offsets[rgdcount] = rgdindoff;
+										for (GA_Iterator vit = gdp->getPrimitive(off)->getVertexRange().begin(); !vit.atEnd(); ++vit) {
+											GA_Offset vtxoff = *vit;
+											UT_Vector3 vrestP = vrrsphnd.get(vtxoff);
+											UT_Vector3 vrestN = vrrsnhnd.get(vtxoff);
+											float vsdf = vrsdfhnd.get(vtxoff);
+
+											rgddat.indices[rgdindoff] = indices[gdp->pointIndex(gdp->vertexPoint(vtxoff))];
+											rgddat.restPositions[rgdindoff * 3 + 0] = vrestP.x();
+											rgddat.restPositions[rgdindoff * 3 + 1] = vrestP.y();
+											rgddat.restPositions[rgdindoff * 3 + 2] = vrestP.z();
+											rgddat.restNormals[rgdindoff * 4 + 0] = vrestN.x();
+											rgddat.restNormals[rgdindoff * 4 + 1] = vrestN.y();
+											rgddat.restNormals[rgdindoff * 4 + 2] = vrestN.z();
+											rgddat.restNormals[rgdindoff * 4 + 3] = vsdf;
+
+											++rgdindoff;
+										}
+										float pstiff = prstfhnd.get(off);
+										UT_Vector3F ptrs = prtrshnd.get(off);
+										UT_Vector4F prot = prrothnd.get(off);
+										rgddat.stiffness[rgdcount] = pstiff;
+										rgddat.translations[rgdcount * 3 + 0] = ptrs.x();
+										rgddat.translations[rgdcount * 3 + 1] = ptrs.y();
+										rgddat.translations[rgdcount * 3 + 2] = ptrs.z();
+										rgddat.rotations[rgdcount * 4 + 0] = prot.x();
+										rgddat.rotations[rgdcount * 4 + 1] = prot.y();
+										rgddat.rotations[rgdcount * 4 + 2] = prot.z();
+										rgddat.rotations[rgdcount * 4 + 3] = prot.w();
+
+										++rgdcount;
+									}
+									else {
+										if (vtxcount == 2) {
+											GA_OffsetListRef vtxs = gdp->getPrimitiveVertexList(off);
+											GA_Offset vt0 = vtxs(0);
+											GA_Offset vt1 = vtxs(1);
+
+											//TODO: check that if we hit pts limit - we dont write geo indices above the limit!!
+											//at this point indices should still be valid
+											sprdat.springIds[springcount * 2 + 0] = indices[gdp->pointIndex(gdp->vertexPoint(vt0))];
+											sprdat.springIds[springcount * 2 + 1] = indices[gdp->pointIndex(gdp->vertexPoint(vt1))];
+											sprdat.springRls[springcount] = rlhnd.get(off);
+											sprdat.springSts[springcount] = sthnd.get(off);
+
+											++springcount;
+										}
+										else if (vtxcount == 3) {
+											GA_OffsetListRef vtxs = gdp->getPrimitiveVertexList(off);
+											GA_Offset vt0 = vtxs(0);
+											GA_Offset vt1 = vtxs(1);
+											GA_Offset vt2 = vtxs(2);
+
+											GA_Offset pt0 = gdp->vertexPoint(vt0);
+											GA_Offset pt1 = gdp->vertexPoint(vt1);
+											GA_Offset pt2 = gdp->vertexPoint(vt2);
+
+											GA_Size tricnt3 = trianglecount * 3;
+											tridat.triangleIds[tricnt3 + 0] = indices[gdp->pointIndex(pt0)];
+											tridat.triangleIds[tricnt3 + 1] = indices[gdp->pointIndex(pt1)];
+											tridat.triangleIds[tricnt3 + 2] = indices[gdp->pointIndex(pt2)];
+
+											if (triNormalType > 0) {
+												UT_Vector3F n;
+												if (triNormalType == 1) {
+													n = nphnd.get(pt0);
+													n += nphnd.get(pt1);
+													n += nphnd.get(pt2);
+													n.normalize();
+												}
+												else if (triNormalType == 2) {
+													n = nvhnd.get(vt0);
+													n += nvhnd.get(vt1);
+													n += nvhnd.get(vt2);
+													n.normalize();
+												}
+												else if (triNormalType == 3) {
+													n = nrhnd.get(off);
+												}
+												tridat.triangleNms[tricnt3 + 0] = n.x();
+												tridat.triangleNms[tricnt3 + 1] = n.y();
+												tridat.triangleNms[tricnt3 + 2] = n.z();
+											}
+
+											++trianglecount;
+										}
+									}
+								}
+								rgddat.offsets[rgdcount] = rgdindoff;
 								consolv->unmapSpringData();
 								consolv->unmapTriangleData();
-								//TODO: check that springcount is in int bounds and clamp it if needed!!
-								consolv->resizeSpringData((int)springcount);
-								consolv->resizeTriangleData((int)trianglecount);
-
+								consolv->unmapRigidData();
 
 							}
 							consolv->pushSpringsToDevice();//Note that we should do this only if change occured in springs. for now we do not detect those changes, so we push always.
 							consolv->pushTrianglesToDevice(triNormalType > 0);
-						}//END SPRINGS AND TRIANGLES
+							consolv->pushRigidsToDevice();
+						}//END SPRINGS AND TRIANGLES AND RIGIDS
 
 					}
 
@@ -342,30 +412,30 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 		if (newgeo == NULL)continue;//TODO: show error;
 		GU_DetailHandleAutoWriteLock lock(newgeo->getOwnGeometry());
 		if (lock.isValid()) {
-			GU_Detail *dgp = lock.getGdp();
+			GU_Detail *gdp = lock.getGdp();
 
 			int* iindex = nvdata->_indices.get(); //TODO: indices dont change - if we got them before solve - keep them!
 			int nactives = NvFlexExtGetActiveList(consolv->container(), iindex); //HERE I REEEEALLY HOPE nooe accesses it right now
 			
-			const bool recreateGeo = nactives != dgp->getNumPoints(); //This basically should never happen with current workflow
+			const bool recreateGeo = nactives != gdp->getNumPoints(); //This basically should never happen with current workflow
 
-			if(recreateGeo)dgp->stashAll();
+			if(recreateGeo)gdp->stashAll();
 
-			//GA_RWAttributeRef vatt = dgp->findPointAttribute("v");//
-			GA_RWAttributeRef vatt = dgp->findFloatTuple(GA_ATTRIB_POINT, "v", 3, 3);
+			//GA_RWAttributeRef vatt = gdp->findPointAttribute("v");//
+			GA_RWAttributeRef vatt = gdp->findFloatTuple(GA_ATTRIB_POINT, "v", 3, 3);
 			if (!vatt.isValid()) {
-				vatt = dgp->addFloatTuple(GA_ATTRIB_POINT, "v", 3, GA_Defaults(0));
+				vatt = gdp->addFloatTuple(GA_ATTRIB_POINT, "v", 3, GA_Defaults(0));
 				vatt.setTypeInfo(GA_TYPE_VECTOR);
 			}
-			//GA_RWAttributeRef iidatt = dgp->findPointAttribute("iid");
-			GA_RWAttributeRef iidatt = dgp->findIntTuple(GA_ATTRIB_POINT, "iid", 1, 1);
+			//GA_RWAttributeRef iidatt = gdp->findPointAttribute("iid");
+			GA_RWAttributeRef iidatt = gdp->findIntTuple(GA_ATTRIB_POINT, "iid", 1, 1);
 			if (!iidatt.isValid()) {
-				iidatt = dgp->addIntTuple(GA_ATTRIB_POINT, "iid", 1, GA_Defaults(-1));
+				iidatt = gdp->addIntTuple(GA_ATTRIB_POINT, "iid", 1, GA_Defaults(-1));
 			}
-			//GA_RWAttributeRef phsatt = dgp->findPointAttribute("phs");
-			GA_RWAttributeRef phsatt = dgp->findIntTuple(GA_ATTRIB_POINT, "phs", 1, 1);
+			//GA_RWAttributeRef phsatt = gdp->findPointAttribute("phs");
+			GA_RWAttributeRef phsatt = gdp->findIntTuple(GA_ATTRIB_POINT, "phs", 1, 1);
 			if (!phsatt.isValid()) {
-				phsatt = dgp->addIntTuple(GA_ATTRIB_POINT, "phs", 1, GA_Defaults(0));
+				phsatt = gdp->addIntTuple(GA_ATTRIB_POINT, "phs", 1, GA_Defaults(0));
 			}
 			GA_RWHandleV3 vhd(vatt);
 			GA_RWHandleI iidhd(iidatt);
@@ -375,15 +445,15 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 			NvFlexExtParticleData pdat = NvFlexExtMapParticleData(consolv->container());	//mapping
 			
 			// get indices and go through active indices!
-			if(recreateGeo)GA_Offset off = dgp->appendPointBlock(nactives);
+			if(recreateGeo)GA_Offset off = gdp->appendPointBlock(nactives);
 
 			GA_Offset ostt, oend;
-			for (GA_Iterator oit(dgp->getPointRange()); oit.blockAdvance(ostt, oend);) { //TODO: make it threaded after debugged
+			for (GA_Iterator oit(gdp->getPointRange()); oit.blockAdvance(ostt, oend);) { //TODO: make it threaded after debugged
 				for (GA_Offset curroff = ostt; curroff < oend; ++curroff) {
 					UT_Vector3 pp;
-					int ii = iindex[dgp->pointIndex(curroff)];
+					int ii = iindex[gdp->pointIndex(curroff)];
 					pp.assign(pdat.particles[ii * 4 + 0], pdat.particles[ii * 4 + 1], pdat.particles[ii * 4 + 2]);
-					dgp->setPos3(curroff, pp);
+					gdp->setPos3(curroff, pp);
 					pp.assign(pdat.velocities[ii * 3 + 0], pdat.velocities[ii * 3 + 1], pdat.velocities[ii * 3 + 2]);
 					vhd.set(curroff, pp);
 					iidhd.set(curroff, ii);
@@ -392,9 +462,9 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 			}
 			NvFlexExtUnmapParticleData(consolv->container());//unmapping
 
-			if(recreateGeo)dgp->destroyStashed();
-			dgp->getAttributes().bumpAllDataIds(GA_ATTRIB_POINT);
-			nvdata->_lastGdpPId = dgp->getP()->getDataId(); //TODO: shit, we cannot save it on solver! save it on data!
+			if(recreateGeo)gdp->destroyStashed();
+			gdp->getAttributes().bumpAllDataIds(GA_ATTRIB_POINT);
+			nvdata->_lastGdpPId = gdp->getP()->getDataId(); //TODO: shit, we cannot save it on solver! save it on data!
 		}
 
 		
