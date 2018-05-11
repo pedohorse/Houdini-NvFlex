@@ -2,7 +2,7 @@
 #include <PRM/PRM_Template.h>
 #include <PRM/PRM_Default.h>
 
-NvFlexLibrary* SIM_NvFlexData::nvFlexLibrary = NULL;
+
 
 static void CreateFluidParticleGrid(NvFlexExtParticleData& ptd, int* indices, Vec3 lower, int dimx, int dimy, int dimz, float radius, Vec3 velocity, float invMass, int phase, float jitter = 0.005f);
 
@@ -99,17 +99,37 @@ static void nvFlexErrorCallbackPrint(NvFlexErrorSeverity type, const char *msg, 
 
 
 SIM_NvFlexData::SIM_NvFlexData(const SIM_DataFactory*fack):SIM_Data(fack),SIM_OptionsUser(this), _indices(nullptr_t(), std::default_delete<int[]>()), _lastGdpPId(-1), _valid(false){
-	if (nvFlexLibrary == NULL) {
-		nvFlexLibrary = NvFlexInit(110, &nvFlexErrorCallbackPrint);
-		std::cout << "flex library initialized" << std::endl;
-	}
 	if (nvFlexLibrary != NULL)_valid = true;
-	std::cout << "flex data constructed" << std::endl;
+	std::cout << "flex data constructed." << std::endl;
 }
 
 
 SIM_NvFlexData::~SIM_NvFlexData(){
-	std::cout << "flex data destructed" << std::endl;
+	std::cout << "flex data destructed." << std::endl;
+}
+
+
+//wrapper
+
+NvFlexLibrary* NvFlexHLibraryHolder::nvFlexLibrary = NULL;
+GA_Size NvFlexHLibraryHolder::_instanceCount = 0;
+
+NvFlexHLibraryHolder::NvFlexHLibraryHolder() {
+	++_instanceCount;
+	if (nvFlexLibrary == NULL) {
+		nvFlexLibrary = NvFlexInit(110, &nvFlexErrorCallbackPrint);
+		std::cout << "flex library initialized" << std::endl;
+	}
+	std::cout << "libhld: instancecount: " << _instanceCount << std::endl;
+}
+NvFlexHLibraryHolder::~NvFlexHLibraryHolder() {
+	--_instanceCount;
+	std::cout << "libhld: instancecount: " << _instanceCount << std::endl;
+	if (_instanceCount == 0) {
+		NvFlexShutdown(nvFlexLibrary);
+		nvFlexLibrary = NULL;
+		std::cout << "flex library destroyed" << std::endl;
+	}
 }
 
 
