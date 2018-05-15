@@ -6,6 +6,21 @@
 
 static void CreateFluidParticleGrid(NvFlexExtParticleData& ptd, int* indices, Vec3 lower, int dimx, int dimy, int dimz, float radius, Vec3 velocity, float invMass, int phase, float jitter = 0.005f);
 
+static uint cudaContextAcquiredCount = 0;
+
+bool acquireCudaContext() {
+	if (SIM_NvFlexData::nvFlexLibrary == NULL)return false;
+	NvFlexAcquireContext(SIM_NvFlexData::nvFlexLibrary);
+	++cudaContextAcquiredCount;
+	return true;
+}
+
+bool releaseCudaContext() {
+	if (SIM_NvFlexData::nvFlexLibrary==NULL || cudaContextAcquiredCount==0)return false;
+	NvFlexRestoreContext(SIM_NvFlexData::nvFlexLibrary);
+	--cudaContextAcquiredCount;
+	return true;
+}
 
 void SIM_NvFlexData::initializeSubclass() {
 	SIM_Data::initializeSubclass();
@@ -14,9 +29,10 @@ void SIM_NvFlexData::initializeSubclass() {
 
 	int ptsmaxcount = getMaxPtsCount();
 	try {
-		NvFlexAcquireContext(SIM_NvFlexData::nvFlexLibrary);
+
+		acquireCudaContext();
 		nvdata.reset(new NvFlexContainerWrapper(SIM_NvFlexData::nvFlexLibrary, ptsmaxcount, 0));
-		NvFlexRestoreContext(SIM_NvFlexData::nvFlexLibrary);
+		releaseCudaContext();
 		_indices.reset(new int[ptsmaxcount]);
 	}
 	catch (...) {
@@ -103,9 +119,9 @@ static void nvFlexErrorCallbackPrint(NvFlexErrorSeverity type, const char *msg, 
 
 //cuda-aware deleter
 void delete_NvFlexContainerWrapper(SIM_NvFlexData::NvFlexContainerWrapper *wrp) {
-	NvFlexAcquireContext(SIM_NvFlexData::nvFlexLibrary);
+	acquireCudaContext();
 	delete wrp;
-	NvFlexRestoreContext(SIM_NvFlexData::nvFlexLibrary);
+	releaseCudaContext();
 }
 
 
@@ -137,6 +153,7 @@ NvFlexHLibraryHolder::~NvFlexHLibraryHolder() {
 	--_instanceCount;
 	std::cout << "libhld: instancecount: " << _instanceCount << std::endl;
 	if (_instanceCount == 0) {
+		while (releaseCudaContext()) {};//release all cuda contexts
 		NvFlexShutdown(nvFlexLibrary);
 		nvFlexLibrary = NULL;
 		std::cout << "flex library destroyed" << std::endl;

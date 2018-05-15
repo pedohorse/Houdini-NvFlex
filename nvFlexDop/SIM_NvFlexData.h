@@ -269,6 +269,8 @@ private: //for a friend
 
 	friend class SIM_NvFlexSolver;
 	friend void delete_NvFlexContainerWrapper(SIM_NvFlexData::NvFlexContainerWrapper *wrp);
+	friend bool acquireCudaContext();
+	friend bool releaseCudaContext();
 
 private:
 	static const SIM_DopDescription* getDescriptionForFucktory();
