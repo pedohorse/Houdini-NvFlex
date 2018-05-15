@@ -65,7 +65,7 @@ private:
 
 class NvFlexHContextAutoGetter {
 public:
-	NvFlexHContextAutoGetter(NvFlexLibrary*lib):_lib(lib) { NvFlexAcquireContext(lib); }
+	explicit NvFlexHContextAutoGetter(NvFlexLibrary*lib):_lib(lib) { NvFlexAcquireContext(lib); }
 	~NvFlexHContextAutoGetter() { NvFlexRestoreContext(_lib); }
 private:
 	NvFlexLibrary* _lib;

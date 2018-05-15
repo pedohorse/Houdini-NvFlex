@@ -10,10 +10,13 @@ static void CreateFluidParticleGrid(NvFlexExtParticleData& ptd, int* indices, Ve
 void SIM_NvFlexData::initializeSubclass() {
 	SIM_Data::initializeSubclass();
 	_lastGdpPId = -1;
+	_lastGdpTId = -1;
 
 	int ptsmaxcount = getMaxPtsCount();
 	try {
+		NvFlexAcquireContext(SIM_NvFlexData::nvFlexLibrary);
 		nvdata.reset(new NvFlexContainerWrapper(SIM_NvFlexData::nvFlexLibrary, ptsmaxcount, 0));
+		NvFlexRestoreContext(SIM_NvFlexData::nvFlexLibrary);
 		_indices.reset(new int[ptsmaxcount]);
 	}
 	catch (...) {
@@ -56,6 +59,7 @@ void SIM_NvFlexData::makeEqualSubclass(const SIM_Data* source) {
 	nvdata = src->nvdata;
 	_indices = src->_indices;
 	_lastGdpPId = src->_lastGdpPId;
+	_lastGdpTId = src->_lastGdpTId;
 	_valid = _valid && src->_valid;
 	if (!_valid) {
 		nvdata.reset();
@@ -97,8 +101,15 @@ static void nvFlexErrorCallbackPrint(NvFlexErrorSeverity type, const char *msg, 
 
 }
 
+//cuda-aware deleter
+void delete_NvFlexContainerWrapper(SIM_NvFlexData::NvFlexContainerWrapper *wrp) {
+	NvFlexAcquireContext(SIM_NvFlexData::nvFlexLibrary);
+	delete wrp;
+	NvFlexRestoreContext(SIM_NvFlexData::nvFlexLibrary);
+}
 
-SIM_NvFlexData::SIM_NvFlexData(const SIM_DataFactory*fack):SIM_Data(fack),SIM_OptionsUser(this), _indices(nullptr_t(), std::default_delete<int[]>()), _lastGdpPId(-1), _valid(false){
+
+SIM_NvFlexData::SIM_NvFlexData(const SIM_DataFactory*fack):SIM_Data(fack),SIM_OptionsUser(this), _indices(nullptr_t(), std::default_delete<int[]>()), nvdata(nullptr_t(), delete_NvFlexContainerWrapper), _lastGdpPId(-1), _lastGdpTId(-1), _valid(false){
 	if (nvFlexLibrary != NULL)_valid = true;
 	std::cout << "flex data constructed." << std::endl;
 }

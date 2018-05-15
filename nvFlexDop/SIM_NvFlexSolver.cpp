@@ -26,7 +26,6 @@
 
 SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine & engine, SIM_ObjectArray & objs, SIM_ObjectArray & newobjs, SIM_ObjectArray & feedbackobjs, const SIM_Time & timestep)
 {
-	NvFlexHContextAutoGetter contextAutoGetAndRelease();
 
 	for (exint obji = 0; obji < objs.entries(); ++obji) {
 		SIM_Object* obj = objs(obji);
@@ -38,7 +37,7 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 			continue;
 		}
 		std::shared_ptr<SIM_NvFlexData::NvFlexContainerWrapper> consolv = nvdata->nvdata;
-
+		NvFlexHContextAutoGetter contextAutoGetAndRelease(nvdata->nvFlexLibrary);
 
 		// Getting old geometry and shoving it into NvFlex buffers
 		const SIM_Geometry *geo=SIM_DATA_GETCONST(*obj, "Geometry", SIM_Geometry);
@@ -47,9 +46,10 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 			if (lock.isValid()) {
 				const GU_Detail *gdp = lock.getGdp();
 				int64 ndid = gdp->getP()->getDataId();
+				int64 ntopdid = gdp->getTopology().getDataId();
 				std::cout << "id = " << ndid << std::endl;
-				if (ndid != nvdata->_lastGdpPId) {
-					std::cout << "found geo, new id !! old id "<< nvdata->_lastGdpPId << std::endl;
+				if (ndid != nvdata->_lastGdpPId || ntopdid != nvdata->_lastGdpTId){
+					std::cout << "found geo, new id !! old P id: "<< nvdata->_lastGdpPId << ". old topo id:" << nvdata->_lastGdpTId <<std::endl;
 					
 					//we just search for attribs, not creating them cuz for now we work with RO geometry
 
@@ -166,9 +166,9 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 										else if (vtxcount == 3)++totaltricount;
 									}
 								}
-								consolv->resizeSpringData(totalspringcount);
-								consolv->resizeTriangleData(totaltricount);
-								consolv->resizeRigidData(totalrigidcount, rgdPrimSizes);
+								consolv->resizeSpringData(totalspringcount);  std::cout << "total springs count: " << totalspringcount << std::endl;
+								consolv->resizeTriangleData(totaltricount);  std::cout << "total triangles count: " << totaltricount << std::endl;
+								consolv->resizeRigidData(totalrigidcount, rgdPrimSizes);  std::cout << "total rigids count: " << totalrigidcount << std::endl;
 
 								auto sprdat = consolv->mapSpringData();
 								auto tridat = consolv->mapTriangleData();
@@ -275,11 +275,14 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 								consolv->unmapTriangleData();
 								consolv->unmapRigidData();
 
-							}
+							} //TODO: imagine geometry changed and no such attribs now - we need to destroy nvFles springs/triangles/rigids and push zero arrays to device as well!
 							consolv->pushSpringsToDevice();//Note that we should do this only if change occured in springs. for now we do not detect those changes, so we push always.
 							consolv->pushTrianglesToDevice(triNormalType > 0);
 							consolv->pushRigidsToDevice();
-						}//END SPRINGS AND TRIANGLES AND RIGIDS
+						}
+						else {//END SPRINGS AND TRIANGLES AND RIGIDS
+							//TODO: no prims, but if there were - push 0 primitives to the device
+						}
 
 					}
 
@@ -309,7 +312,7 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 			for (exint afi = 0; afi < affs.entries(); ++afi) {
 				const SIM_Object* aff = affs(afi);
 				if (aff == obj)continue;
-				std::cout << aff->getName() << " : " << aff->getObjectId() << std::endl;
+				//std::cout << aff->getName() << " : " << aff->getObjectId() << std::endl;
 				const SIM_Geometry*affgeo = SIM_DATA_GETCONST(*aff, SIM_GEOMETRY_DATANAME, SIM_Geometry);
 				if (affgeo == NULL)continue;
 
@@ -320,7 +323,7 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 				std::string objidname = std::to_string(aff->getObjectId());
 
 				if(pDataId != colldata->getStoredHash(objidname)){
-					std::cout << "updating mesh " << objidname << std::endl;
+					std::cout << "updating collision mesh " << objidname << std::endl;
 					colldata->setStoredHash(objidname, pDataId);
 					colldata->addTriangleMesh(objidname);
 					NvfTrimeshGeo trigeo=colldata->getTriangleMesh(objidname);
@@ -403,10 +406,11 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 		}
 		NvFlexSetParams(consolv->solver(), &nvparams);
 
-		NvFlexExtTickContainer(consolv->container(), timestep, substeps, false);
+		//NvFlexExtTickContainer(consolv->container(), timestep, substeps, false);
+		NvFlexUpdateSolver(consolv->solver(), timestep, substeps, false);
 
 		NvFlexExtPullFromDevice(consolv->container());
-
+		if (consolv->getRigidCount() > 0)consolv->pullRigidsFromDevice();
 
 		SIM_GeometryCopy *newgeo=SIM_DATA_CREATE(*obj, "Geometry", SIM_GeometryCopy, SIM_DATA_RETURN_EXISTING | SIM_DATA_ADOPT_EXISTING_ON_DELETE);
 		if (newgeo == NULL)continue;//TODO: show error;
@@ -462,9 +466,49 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 			}
 			NvFlexExtUnmapParticleData(consolv->container());//unmapping
 
+
+			//Now update rigids
+			GA_ROHandleI prgdhnd(gdp->findPrimitiveAttribute("rgd_isrigid"));
+			if (prgdhnd.isValid() && consolv->getRigidCount() > 0) {
+				GA_RWAttributeRef ptrsat = gdp->findFloatTuple(GA_ATTRIB_PRIMITIVE, "rgd_translation", 3, 3);
+				if (!ptrsat.isValid()) {
+					ptrsat = gdp->addFloatTuple(GA_ATTRIB_PRIMITIVE, "rgd_translation", 3);
+				}
+				GA_RWAttributeRef protat = gdp->findFloatTuple(GA_ATTRIB_PRIMITIVE, "rgd_rotation", 4, 4);
+				if (!protat.isValid()) {
+					protat = gdp->addFloatTuple(GA_ATTRIB_PRIMITIVE, "rgd_rotation", 3);
+				}
+				GA_RWHandleV3 ptrshnd(ptrsat);
+				GA_RWHandleV4 prothnd(protat);
+
+				auto rgdtransdata = consolv->mapRigidTransData();
+
+				GA_Size rigidNum = 0;
+				for (GA_Iterator pit(gdp->getPrimitiveRange()); !pit.atEnd(); ++pit) {
+					GA_Offset off = *pit;
+					if (prgdhnd.get(off)) {
+						UT_Vector3F trs;
+						UT_Vector4F rot;
+						trs.assign(rgdtransdata.translations[rigidNum * 3 + 0], rgdtransdata.translations[rigidNum * 3 + 1], rgdtransdata.translations[rigidNum * 3 + 2]);
+						rot.assign(rgdtransdata.rotations[rigidNum * 4 + 0], rgdtransdata.rotations[rigidNum * 4 + 1], rgdtransdata.rotations[rigidNum * 4 + 2], rgdtransdata.rotations[rigidNum * 4 + 3]);
+						ptrshnd.set(off, trs);
+						prothnd.set(off, rot);
+						++rigidNum;
+					}
+				}
+
+				consolv->unmapRigidTransData();
+
+			}
+			//END UPDATE RIGIDS
+
 			if(recreateGeo)gdp->destroyStashed();
-			gdp->getAttributes().bumpAllDataIds(GA_ATTRIB_POINT);
-			nvdata->_lastGdpPId = gdp->getP()->getDataId(); //TODO: shit, we cannot save it on solver! save it on data!
+			gdp->bumpAllDataIds();
+			//gdp->getAttributes().bumpAllDataIds(GA_ATTRIB_POINT);
+			//gdp->getAttributes().bumpAllDataIds(GA_ATTRIB_PRIMITIVE);
+			nvdata->_lastGdpPId = gdp->getP()->getDataId();
+			nvdata->_lastGdpTId = gdp->getTopology().getDataId();
+
 		}
 
 		
@@ -493,7 +537,7 @@ void SIM_NvFlexSolver::updateSolverParams() {
 	nvparams.gravity[1] = 0;
 	nvparams.gravity[2] = 0;
 	nvparams.fluidRestDistance = nvparams.radius * getFluidRestDistanceMult();
-	nvparams.solidRestDistance = nvparams.fluidRestDistance;
+	nvparams.solidRestDistance = nvparams.fluidRestDistance; //TODO: make a parameter for this
 	nvparams.numIterations = getIterations();
 	nvparams.maxSpeed = getMaxSpeed(); //FLT_MAX;
 	nvparams.maxAcceleration = getMaxAcceleration(); //1000.0f;

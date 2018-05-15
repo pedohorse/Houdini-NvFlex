@@ -28,7 +28,6 @@ class SIM_NvFlexSolver; //fwd decl
 
 class SIM_NvFlexData:public SIM_Data, public SIM_OptionsUser, public NvFlexHLibraryHolder
 {
-	friend class SIM_NvFlexSolver;
 public:
 	class NvFlexContainerWrapper {
 	public:
@@ -59,6 +58,13 @@ public:
 			NvFlexHRigidData(int*off, int*ind, float*rep, float*ren, float*stf, float*rot, float*trs) :offsets(off), indices(ind), restPositions(rep), restNormals(ren), stiffness(stf), rotations(rot), translations(trs) {};
 		} NvFlexRigidData;
 
+		typedef struct NvFlexHRigidTransData {
+			int rigidsCount;
+			float* rotations; //numRigids*4 (quat)
+			float* translations;
+			NvFlexHRigidTransData(float*trs, float*rot, int count) :translations(trs), rotations(rot), rigidsCount(count) {};
+		} NvFlexHRigidTransData;
+
 		explicit NvFlexContainerWrapper(NvFlexLibrary*lib, int maxParticles, int MaxDiffuseParticles, int maxNeighbours = 96):_springIndices(lib),_springRestLengths(lib),_springStrenghts(lib), _triangleIndices(lib),_triangleNormals(lib), _rgdOffsets(lib), _rgdIndices(lib), _rgdRestPositions(lib), _rgdRestNormals(lib), _rgdStiffness(lib), _rgdRotations(lib), _rgdTranslations(lib) {
 			_slv = NvFlexCreateSolver(lib, maxParticles, MaxDiffuseParticles, maxNeighbours);
 			if (_slv == NULL)throw std::runtime_error("NULL NVFLEX SOLVER!");
@@ -68,9 +74,12 @@ public:
 		}
 		NvFlexContainerWrapper(NvFlexContainerWrapper&) = delete;
 		~NvFlexContainerWrapper() {
+			//NvFlexAcquireContext(SIM_NvFlexData::nvFlexLibrary);
+			//no aquire cuz we assume the destructor wrapper is responsible for that
 			NvFlexExtDestroyContainer(_cont);
 			NvFlexDestroySolver(_slv);
 			delete _colld;
+			//NvFlexRestoreContext(SIM_NvFlexData::nvFlexLibrary);
 		}
 
 		NvFlexSolver* solver() { return _slv; }
@@ -196,8 +205,22 @@ public:
 			_rgdRotations.unmap();
 			_rgdTranslations.unmap();
 		}
+		NvFlexHRigidTransData mapRigidTransData() { //maps just the translation+rotation data instead of the whole bunch
+			_rgdRotations.map();
+			_rgdTranslations.map();
+			return NvFlexHRigidTransData(_rgdTranslations.mappedPtr, _rgdRotations.mappedPtr, _rgdStiffness.size());
+		}
+		void unmapRigidTransData() {
+			_rgdRotations.unmap();
+			_rgdTranslations.unmap();
+		}
 		void pushRigidsToDevice() {
 			NvFlexSetRigids(_slv, _rgdOffsets.buffer, _rgdIndices.buffer, _rgdRestPositions.buffer, _rgdRestNormals.buffer, _rgdStiffness.buffer, _rgdRotations.buffer, _rgdTranslations.buffer, _rgdStiffness.size(), _rgdIndices.size());
+		}
+		void pullRigidsFromDevice() {
+			//pull rigid transformations recalculated by solver
+			//WARNING! buffers MUST already be properly resized!
+			NvFlexGetRigidTransforms(_slv, _rgdRotations.buffer, _rgdTranslations.buffer);
 		}
 
 	private:
@@ -242,7 +265,10 @@ private:
 	bool _valid;
 private: //for a friend
 	std::shared_ptr<int> _indices;
-	int64 _lastGdpPId;
+	int64 _lastGdpPId,_lastGdpTId;
+
+	friend class SIM_NvFlexSolver;
+	friend void delete_NvFlexContainerWrapper(SIM_NvFlexData::NvFlexContainerWrapper *wrp);
 
 private:
 	static const SIM_DopDescription* getDescriptionForFucktory();
