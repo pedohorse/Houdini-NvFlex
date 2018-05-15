@@ -14,6 +14,9 @@
 !examples
 !examples/*
 
+!otls
+!otls/*
+
 **.vcxproj.user
 nvFlexDop/x64/
 
