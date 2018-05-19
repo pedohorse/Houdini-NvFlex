@@ -18,6 +18,7 @@ public:
 	virtual ~NvFlexHLibraryHolder();
 protected:
 	static NvFlexLibrary* nvFlexLibrary;
+	static bool cudaContextCreated;
 private:
 	static GA_Size _instanceCount;
 };

@@ -2,6 +2,8 @@
 #include <PRM/PRM_Template.h>
 #include <PRM/PRM_Default.h>
 
+#include <NvFlexDevice.h>
+
 
 
 static void CreateFluidParticleGrid(NvFlexExtParticleData& ptd, int* indices, Vec3 lower, int dimx, int dimy, int dimz, float radius, Vec3 velocity, float invMass, int phase, float jitter = 0.005f);
@@ -28,8 +30,8 @@ void SIM_NvFlexData::initializeSubclass() {
 	_lastGdpTId = -1;
 
 	int ptsmaxcount = getMaxPtsCount();
+	
 	try {
-
 		acquireCudaContext();
 		nvdata.reset(new NvFlexContainerWrapper(SIM_NvFlexData::nvFlexLibrary, ptsmaxcount, 0));
 		releaseCudaContext();
@@ -42,6 +44,7 @@ void SIM_NvFlexData::initializeSubclass() {
 		_indices.reset();
 		return;
 	}
+
 	std::cout << "nvflex data initialized with " << ptsmaxcount << std::endl;
 
 	//debug test
@@ -66,10 +69,11 @@ void SIM_NvFlexData::initializeSubclass() {
 
 void SIM_NvFlexData::makeEqualSubclass(const SIM_Data* source) {
 	SIM_Data::makeEqualSubclass(source);
-
+	std::cout << "do makeEqual" << std::endl;
 	const SIM_NvFlexData* src = SIM_DATA_CASTCONST(source, SIM_NvFlexData);
 	if (src == NULL) {
 		// some info?
+		std::cout << "makeEqual src==Null" << std::endl;
 		return;
 	}
 	nvdata = src->nvdata;
@@ -78,6 +82,7 @@ void SIM_NvFlexData::makeEqualSubclass(const SIM_Data* source) {
 	_lastGdpTId = src->_lastGdpTId;
 	_valid = _valid && src->_valid;
 	if (!_valid) {
+		std::cout << "makeEqual data was invalid" << std::endl;
 		nvdata.reset();
 		_indices.reset();
 	}
@@ -137,14 +142,26 @@ SIM_NvFlexData::~SIM_NvFlexData(){
 
 
 //wrapper
-
+bool NvFlexHLibraryHolder::cudaContextCreated = false;
 NvFlexLibrary* NvFlexHLibraryHolder::nvFlexLibrary = NULL;
 GA_Size NvFlexHLibraryHolder::_instanceCount = 0;
+
+
 
 NvFlexHLibraryHolder::NvFlexHLibraryHolder() {
 	++_instanceCount;
 	if (nvFlexLibrary == NULL) {
-		nvFlexLibrary = NvFlexInit(110, &nvFlexErrorCallbackPrint);
+		if (!cudaContextCreated) {
+			if (!NvFlexDeviceCreateCudaContext(NvFlexDeviceGetSuggestedOrdinal()))throw std::runtime_error("Cannot initialize Cuda Context");
+			cudaContextCreated = true;
+		}
+		NvFlexInitDesc desc;
+		desc.deviceIndex = 0; // ignored, device index is set by the context
+		desc.enableExtensions = false;
+		desc.renderDevice = NULL;
+		desc.renderContext = NULL;
+		desc.computeType = NvFlexComputeType::eNvFlexCUDA;
+		nvFlexLibrary = NvFlexInit(110, &nvFlexErrorCallbackPrint,&desc);
 		std::cout << "flex library initialized" << std::endl;
 	}
 	std::cout << "libhld: instancecount: " << _instanceCount << std::endl;
@@ -153,9 +170,14 @@ NvFlexHLibraryHolder::~NvFlexHLibraryHolder() {
 	--_instanceCount;
 	std::cout << "libhld: instancecount: " << _instanceCount << std::endl;
 	if (_instanceCount == 0) {
-		while (releaseCudaContext()) {};//release all cuda contexts
+		//no, lets assume that we need to have proper context by this time for it to be properly released
+		// and lets assume that NvFlexShutdown restores previous context
+		//while (releaseCudaContext()) {};//release all cuda contexts
+		//NvFlexAcquireContext(nvFlexLibrary);
 		NvFlexShutdown(nvFlexLibrary);
 		nvFlexLibrary = NULL;
+		//cudaContextAcquiredCount = 0;
+		//NvFlexDeviceDestroyCudaContext();
 		std::cout << "flex library destroyed" << std::endl;
 	}
 }
