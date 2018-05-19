@@ -21,7 +21,27 @@
 
 #include "NvFlexHTriangleMesh.h"
 
+#include <NvFlexDevice.h>
 
+static void nvFlexErrorCallbackPrint(NvFlexErrorSeverity type, const char *msg, const char *file, int line) {
+	switch (type) {
+	case eNvFlexLogError:
+		std::cout << "NvF ERROR: "; break;
+	case eNvFlexLogWarning:
+		std::cout << "NvF WARNING: "; break;
+	case eNvFlexLogDebug:
+		std::cout << "NvF DEBUG: "; break;
+	case eNvFlexLogAll:
+		std::cout << "NvF ALL: "; break;
+	}
+	if (msg != NULL)std::cout << msg;
+	std::cout << " :: ";
+	if (file != NULL)std::cout << file;
+	std::cout << " :: ";
+	std::cout << line;
+	std::cout << std::endl;
+
+}
 
 
 SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine & engine, SIM_ObjectArray & objs, SIM_ObjectArray & newobjs, SIM_ObjectArray & feedbackobjs, const SIM_Time & timestep)
@@ -31,13 +51,20 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 		SIM_Object* obj = objs(obji);
 
 		SIM_NvFlexData* nvdata = SIM_DATA_GET(*obj, "NvFlexData", SIM_NvFlexData);
-		if (nvdata == NULL)continue;
+		if (nvdata == NULL) {
+			addError(obj, SIM_BADSUBDATA, "NvFlexData is not found on the object", UT_ERROR_WARNING);
+			continue;
+		}
 		if (!nvdata->isNvValid()) {
 			addError(obj, SIM_BADSUBDATA, "NvFlexData is in invalid state (maybe insufficient GPU resources). try resetting the simulation.", UT_ERROR_WARNING);
 			continue;
 		}
-		std::shared_ptr<SIM_NvFlexData::NvFlexContainerWrapper> consolv = nvdata->nvdata;
+
 		NvFlexHContextAutoGetter contextAutoGetAndRelease(nvdata->nvFlexLibrary);
+
+		std::shared_ptr<SIM_NvFlexData::NvFlexContainerWrapper> consolv = nvdata->nvdata;
+
+		
 
 		// Getting old geometry and shoving it into NvFlex buffers
 		const SIM_Geometry *geo=SIM_DATA_GETCONST(*obj, "Geometry", SIM_Geometry);
@@ -275,13 +302,28 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 								consolv->unmapTriangleData();
 								consolv->unmapRigidData();
 
-							} //TODO: imagine geometry changed and no such attribs now - we need to destroy nvFles springs/triangles/rigids and push zero arrays to device as well!
-							consolv->pushSpringsToDevice();//Note that we should do this only if change occured in springs. for now we do not detect those changes, so we push always.
-							consolv->pushTrianglesToDevice(triNormalType > 0);
-							consolv->pushRigidsToDevice();
+
+								consolv->pushSpringsToDevice();//Note that we should do this only if change occured in springs. for now we do not detect those changes, so we push always.
+								consolv->pushTrianglesToDevice(triNormalType > 0);
+								consolv->pushRigidsToDevice();
+
+							}
+							else {//TODO: imagine geometry changed and no such attribs now - we need to destroy nvFles springs/triangles/rigids and push zero arrays to device as well!
+								consolv->resizeSpringData(0);
+								consolv->resizeTriangleData(0);
+								consolv->resizeRigidData(0,std::vector<int>());
+								consolv->pushSpringsToDevice();
+								consolv->pushTrianglesToDevice(false);
+								consolv->pushRigidsToDevice();
+							}
 						}
 						else {//END SPRINGS AND TRIANGLES AND RIGIDS
-							//TODO: no prims, but if there were - push 0 primitives to the device
+							consolv->resizeSpringData(0);
+							consolv->resizeTriangleData(0);
+							consolv->resizeRigidData(0, std::vector<int>());
+							consolv->pushSpringsToDevice();
+							consolv->pushTrianglesToDevice(false);
+							consolv->pushRigidsToDevice();
 						}
 
 					}
@@ -388,6 +430,7 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 
 		nvparams.numIterations = getIterations();
 		int substeps = getSubsteps();
+		NvFlexGetParams(consolv->solver(), &nvparams);
 		updateSolverParams();
 		//Find and apply gravity
 		{
@@ -407,6 +450,7 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 		NvFlexSetParams(consolv->solver(), &nvparams);
 
 		//NvFlexExtTickContainer(consolv->container(), timestep, substeps, false);
+		std::cout << "timestep " << timestep << std::endl;
 		NvFlexUpdateSolver(consolv->solver(), timestep, substeps, false);
 
 		NvFlexExtPullFromDevice(consolv->container());
@@ -418,10 +462,14 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 		if (lock.isValid()) {
 			GU_Detail *gdp = lock.getGdp();
 
-			int* iindex = nvdata->_indices.get(); //TODO: indices dont change - if we got them before solve - keep them!
-			int nactives = NvFlexExtGetActiveList(consolv->container(), iindex); //HERE I REEEEALLY HOPE nooe accesses it right now
+			int* const iindex = nvdata->_indices.get(); //TODO: indices dont change - if we got them before solve - keep them!
+			const int nactives = NvFlexExtGetActiveList(consolv->container(), iindex); //HERE I REEEEALLY HOPE nooe accesses it right now
 			
 			const bool recreateGeo = nactives != gdp->getNumPoints(); //This basically should never happen with current workflow
+
+			if (recreateGeo) {
+				std::cout << "recreate==true. geo inconsistent. " << nactives << " vs " << gdp->getNumPoints() << std::endl;
+			}
 
 			if(recreateGeo)gdp->stashAll();
 
@@ -531,6 +579,7 @@ void SIM_NvFlexSolver::initializeSubclass()
 }
 
 void SIM_NvFlexSolver::updateSolverParams() {
+
 	nvparams.radius = getRadius();
 
 	nvparams.gravity[0] = 0;
@@ -577,6 +626,11 @@ void SIM_NvFlexSolver::updateSolverParams() {
 	nvparams.vorticityConfinement = getVorticityConfinement();// 0.0f;
 	nvparams.buoyancy = getBuoyancy();// 1.0f;
 
+	//nvparams.restitution = 0;
+	//nvparams.sleepThreshold = 0;
+	//nvparams.shockPropagation = 0;
+	//nvparams.dissipation = 0;
+	//nvparams.damping = 0;
 
 	UT_Vector3F wind = getWind();
 	nvparams.wind[0] = wind.x();
