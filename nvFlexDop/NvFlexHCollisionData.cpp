@@ -69,6 +69,8 @@ bool NvFlexHCollisionData::addTriangleMesh(std::string key) {
 	colgeovec[nid].triMesh.scale[2] = 1.0f;
 	rotationvec[nid] = Quat();
 	prevrotationvec[nid] = Quat();
+	positionvec[nid] = Vec4(0, 0, 0, 1);
+	prevpositionvec[nid] = Vec4(0, 0, 0, 1);
 	NvFlexHTriangleMesh* newmesh = new NvFlexHTriangleMesh(colgeovec.lib);
 	NvFlexTriangleMeshId meshid = newmesh->getId();
 	meshmap[meshid] = newmesh;
