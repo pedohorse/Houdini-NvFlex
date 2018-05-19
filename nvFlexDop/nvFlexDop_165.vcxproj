@@ -51,7 +51,7 @@
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v140</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
@@ -76,6 +76,7 @@
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="PathsConfig165.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -86,6 +87,13 @@
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(HoudiniPath)\toolkit\include;$(NvFlexPath)/include;$(CUDA_PATH)/include;$(CUDA_PATH)/extras/cupti/include</IncludePath>
     <TargetExt>.dll</TargetExt>
     <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;$(CUDA_PATH)/lib/x64;$(NvFlexPath)/lib/win64</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(HoudiniPath)\toolkit\include;$(NvFlexPath)/include;$(CUDA_PATH)/include;$(CUDA_PATH)/extras/cupti/include</IncludePath>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;$(CUDA_PATH)/lib/x64;$(NvFlexPath)/lib/win64</LibraryPath>
+    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)_165\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)_165\</IntDir>
+    <TargetExt>.dll</TargetExt>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -98,8 +106,15 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <SDLCheck>true</SDLCheck>
+      <SDLCheck>false</SDLCheck>
+      <AdditionalOptions>-nologo -TP -Zc:forScope -Zc:rvalueCast -Zc:strictStrings -DAMD64 -DSIZEOF_VOID_P=8 -DI386 -DWIN32 -DSWAP_BITFIELDS -D_WIN32_WINNT=0x0502 -DNOMINMAX -DSTRICT -DWIN32_LEAN_AND_MEAN -D_USE_MATH_DEFINES -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -D_SCL_SECURE_NO_WARNINGS -DSESI_LITTLE_ENDIAN -DHBOOST_ALL_NO_LIB -DEIGEN_MALLOC_ALREADY_ALIGNED=0 -DFBX_ENABLED=1 -DOPENCL_ENABLED=1 -DOPENVDB_ENABLED=1 -I .  -I "C:/Program Files/Side Effects Software/HOUDIN~1.323/toolkit/include" -I "C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC/include" -I "C:/Program Files (x86)/Windows Kits/10/Include/10.0.10240.0/ucrt" -I "C:/Program Files (x86)/Windows Kits/8.1/Include/um" -I "C:/Program Files (x86)/Windows Kits/8.1/Include/shared" -wd4355 -w14996 -Od -Z7 -DUT_ASSERT_LEVEL=2 -MD -EHsc -GR -bigobj</AdditionalOptions>
+      <PreprocessorDefinitions>MAKING_DSO;_WINDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
+    <Link>
+      <AdditionalOptions>-link -LIBPATH:"C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC/lib/amd64" -LIBPATH:"C:/Program Files (x86)/Windows Kits/10/Lib/10.0.10240.0/ucrt/x64" -LIBPATH:"C:/Program Files (x86)/Windows Kits/8.1/Lib/winv6.3/um/x64"   -LIBPATH:"C:/Program Files/Side Effects Software/HOUDIN~1.323/custom/houdini/dsolib" "C:/Program Files/Side Effects Software/HOUDIN~1.323/custom/houdini/dsolib/*.a" "C:/Program Files/Side Effects Software/HOUDIN~1.323/custom/houdini/dsolib/*.lib"</AdditionalOptions>
+      <AdditionalDependencies>cudart.lib;NvFlexDebugCUDA_x64.lib;NvFlexExtDebugCUDA_x64.lib;NvFlexDeviceDebug_x64.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <EnableUAC>false</EnableUAC>
+    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
