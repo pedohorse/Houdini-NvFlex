@@ -1,7 +1,7 @@
 # Houdini-NvFlex
 simple integration of Nvidia Flex technology into SideFX Houdini
 
-[see animated preview here](https://i.imgur.com/rKzsk49.mp4)
+[see animated preview here](https://i.imgur.com/rKzsk49.gifv)
 
 ![preview](https://i.imgur.com/rKzsk49.gif)
 
