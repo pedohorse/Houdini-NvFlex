@@ -130,7 +130,7 @@ void delete_NvFlexContainerWrapper(SIM_NvFlexData::NvFlexContainerWrapper *wrp) 
 }
 
 
-SIM_NvFlexData::SIM_NvFlexData(const SIM_DataFactory*fack):SIM_Data(fack),SIM_OptionsUser(this), _indices(nullptr_t(), std::default_delete<int[]>()), nvdata(nullptr_t(), delete_NvFlexContainerWrapper), _lastGdpPId(-1), _lastGdpTId(-1), _valid(false){
+SIM_NvFlexData::SIM_NvFlexData(const SIM_DataFactory*fack):SIM_Data(fack),SIM_OptionsUser(this), _indices(nullptr_t(), std::default_delete<int[]>()), nvdata(nullptr_t(), delete_NvFlexContainerWrapper), _lastGdpPId(-1), _lastGdpTId(-1), _lastGdpStrId(-1), _valid(false){
 	if (nvFlexLibrary != NULL)_valid = true;
 	std::cout << "flex data constructed." << std::endl;
 }

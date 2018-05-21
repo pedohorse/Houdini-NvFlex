@@ -266,7 +266,7 @@ private:
 	bool _valid;
 private: //for a friend
 	std::shared_ptr<int> _indices;
-	int64 _lastGdpPId,_lastGdpTId;
+	int64 _lastGdpPId,_lastGdpTId,_lastGdpStrId;
 
 	friend class SIM_NvFlexSolver;
 	friend void delete_NvFlexContainerWrapper(SIM_NvFlexData::NvFlexContainerWrapper *wrp);
