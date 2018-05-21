@@ -86,6 +86,12 @@
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(HoudiniPath)\toolkit\include;$(NvFlexPath)\include;$(CUDA_PATH)/include;$(CUDA_PATH)/extras/cupti/include</IncludePath>
     <TargetExt>.dll</TargetExt>
     <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;$(CUDA_PATH)/lib/x64;$(NvFlexPath)\lib\win64</LibraryPath>
+    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)_160\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)_160\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)_160\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)_160\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
