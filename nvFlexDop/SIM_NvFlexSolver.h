@@ -18,6 +18,8 @@ public:
 	GETSET_DATA_FUNCS_I("substeps", Substeps);
 	GETSET_DATA_FUNCS_F("maxSpeed", MaxSpeed);
 	GETSET_DATA_FUNCS_F("maxAcceleration", MaxAcceleration);
+	GETSET_DATA_FUNCS_F("sleepThreshold", SleepThreshold);
+	GETSET_DATA_FUNCS_I("fluid", DoFluid);
 
 	GETSET_DATA_FUNCS_F("fluidRestDistanceMult", FluidRestDistanceMult);
 
@@ -35,12 +37,15 @@ public:
 	GETSET_DATA_FUNCS_F("dynamicfriction", DynamicFriction);
 	GETSET_DATA_FUNCS_F("staticfriction", StaticFriction);
 	GETSET_DATA_FUNCS_F("particleFriction", ParticleFriction);
+	GETSET_DATA_FUNCS_F("freeSurfaceDrag", FreeSurfaceDrag);
 	GETSET_DATA_FUNCS_F("drag", Drag);
 	GETSET_DATA_FUNCS_F("lift", Lift);
 
 	GETSET_DATA_FUNCS_F("shapeCollisionMargin", ShapeCollisionMargin);
 	GETSET_DATA_FUNCS_F("particleCollisionMargin", ParticleCollisionMargin);
 	GETSET_DATA_FUNCS_F("collisionDistance", CollisionDistance);
+
+	GETSET_DATA_FUNCS_F("shockPropagation", ShockPropagation);
 
 	GETSET_DATA_FUNCS_V3("wind", Wind);
 

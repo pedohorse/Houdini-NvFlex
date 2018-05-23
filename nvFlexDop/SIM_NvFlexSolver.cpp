@@ -600,13 +600,14 @@ void SIM_NvFlexSolver::updateSolverParams() {
 	nvparams.numIterations = getIterations();
 	nvparams.maxSpeed = getMaxSpeed(); //FLT_MAX;
 	nvparams.maxAcceleration = getMaxAcceleration(); //1000.0f;
-	nvparams.fluid = true;
+	nvparams.sleepThreshold = getSleepThreshold();//0.0f;
+	nvparams.fluid = (bool)getDoFluid();//true;
 
 	nvparams.viscosity = getViscosity();
 	nvparams.dynamicFriction = getDynamicFriction();
 	nvparams.staticFriction = getStaticFriction();
 	nvparams.particleFriction = getParticleFriction();//0.0f; // scale friction between particles by default
-	nvparams.freeSurfaceDrag = 0.0f;
+	nvparams.freeSurfaceDrag = getFreeSurfaceDrag(); //0.0f;
 	nvparams.drag = getDrag();// 0.0f;
 	nvparams.lift = getLift();// 0.0f;
 
@@ -626,6 +627,7 @@ void SIM_NvFlexSolver::updateSolverParams() {
 	nvparams.shapeCollisionMargin = getShapeCollisionMargin();
 	nvparams.particleCollisionMargin = getParticleCollisionMargin();
 	nvparams.collisionDistance = getCollisionDistance();
+	nvparams.shockPropagation = getShockPropagation();
 
 	nvparams.relaxationMode = eNvFlexRelaxationLocal;
 	nvparams.relaxationFactor = getRelaxationFactor();// 1.0f;
@@ -669,6 +671,8 @@ const SIM_DopDescription* SIM_NvFlexSolver::getDescriptionForFucktory() {
 	static PRM_Name substeps_name("substeps", "Substeps Count");
 	static PRM_Name maxSpeed_name("maxSpeed", "Maximum Particle Speed");
 	static PRM_Name maxAcceleration_name("maxAcceleration", "Maximum Particle Acceleration");
+	static PRM_Name sleepThreshold_name("sleepThreshold", "Particle Sleep Threshold");
+	static PRM_Name doFluid_name("fluid", "Do Fluids");
 
 	static PRM_Name fluidRestDistanceMult_name("fluidRestDistanceMult", "Rest Distance Multiplier");
 	static PRM_Name planesCount_name("planesCount", "Planes Count");
@@ -684,6 +688,7 @@ const SIM_DopDescription* SIM_NvFlexSolver::getDescriptionForFucktory() {
 	static PRM_Name dynamicfriction_name("dynamicfriction", "Dynamic Friction");
 	static PRM_Name staticfriction_name("staticfriction", "Static Friction");
 	static PRM_Name particleFriction_name("particleFriction", "Particle Friction");
+	static PRM_Name freeSurfaceDrag_name("freeSurfaceDrag", "Free Surface Drag");
 	static PRM_Name drag_name("drag", "Cloth Drag");
 	static PRM_Name lift_name("lift", "Cloth Lift");
 	static PRM_Name wind_name("wind", "Wind");
@@ -691,6 +696,8 @@ const SIM_DopDescription* SIM_NvFlexSolver::getDescriptionForFucktory() {
 	static PRM_Name shapeCollisionMargin_name("shapeCollisionMargin", "Shape Collision Margin");
 	static PRM_Name particleCollisionMargin_name("particleCollisionMargin", "Particle Collision Margin");
 	static PRM_Name collisionDistance_name("collisionDistance", "Collision Distance");
+
+	static PRM_Name shockPropagation_name("shockPropagation", "Shock Propagation");
 	
 
 	static PRM_Default radius_default(0.2f);
@@ -717,6 +724,7 @@ const SIM_DopDescription* SIM_NvFlexSolver::getDescriptionForFucktory() {
 	static PRM_Default collisionDistance_defaults(0.0275f);
 
 	static PRM_Default zero_defaults(0.0f);
+	static PRM_Default one_defaults(1.0f);
 
 	static PRM_Range iterations_range(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 16);
 	static PRM_Range substeps_range(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 16);
@@ -740,6 +748,8 @@ const SIM_DopDescription* SIM_NvFlexSolver::getDescriptionForFucktory() {
 		PRM_Template(PRM_INT, 1, &substeps_name, &substeps_default, 0, &substeps_range),
 		PRM_Template(PRM_FLT_LOG, 1, &maxSpeed_name, &maxSpeed_default, 0, &maxSpeed_range),
 		PRM_Template(PRM_FLT, 1, &maxAcceleration_name, &maxAcceleration_default, 0, &maxAcceleration_range),
+		PRM_Template(PRM_FLT, 1, &sleepThreshold_name, &zero_defaults),
+		PRM_Template(PRM_TOGGLE, 1, &doFluid_name,&one_defaults),
 		PRM_Template(PRM_SEPARATOR, 1, &sep0),
 		PRM_Template(PRM_FLT, 1, &fluidRestDistanceMult_name, &fluidRestDistanceMult_defaults),
 		PRM_Template(PRM_INT, 1, &planesCount_name,&planesCount_defaults,0,&planesCount_range),
@@ -756,6 +766,7 @@ const SIM_DopDescription* SIM_NvFlexSolver::getDescriptionForFucktory() {
 		PRM_Template(PRM_FLT, 1, &dynamicfriction_name, &dynamicfriction_defaults),
 		PRM_Template(PRM_FLT, 1, &staticfriction_name, &staticfriction_defaults),
 		PRM_Template(PRM_FLT, 1, &particleFriction_name, &particleFriction_defaults),
+		PRM_Template(PRM_FLT, 1, &freeSurfaceDrag_name, &zero_defaults, 0, &zeroOne_range),
 		PRM_Template(PRM_FLT, 1, &drag_name, &zero_defaults, 0, &zeroOne_range),
 		PRM_Template(PRM_FLT, 1, &lift_name, &zero_defaults, 0, &zeroOne_range),
 		PRM_Template(PRM_FLT, 3, &wind_name, 0),
@@ -763,6 +774,7 @@ const SIM_DopDescription* SIM_NvFlexSolver::getDescriptionForFucktory() {
 		PRM_Template(PRM_FLT, 1, &shapeCollisionMargin_name, &shapeCollisionMargin_defaults),
 		PRM_Template(PRM_FLT, 1, &particleCollisionMargin_name, &particleCollisionMargin_defaults),
 		PRM_Template(PRM_FLT, 1, &collisionDistance_name, &collisionDistance_defaults),
+		PRM_Template(PRM_FLT, 1, &shockPropagation_name, &zero_defaults),
 		PRM_Template()
 	};
 
