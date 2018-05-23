@@ -52,7 +52,7 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 
 		SIM_NvFlexData* nvdata = SIM_DATA_GET(*obj, "NvFlexData", SIM_NvFlexData);
 		if (nvdata == NULL) {
-			addError(obj, SIM_BADSUBDATA, "NvFlexData is not found on the object", UT_ERROR_WARNING);
+			addError(obj, SIM_MISSINGDATA, "NvFlexData is not found on the object", UT_ERROR_WARNING);
 			continue;
 		}
 		if (!nvdata->isNvValid()) {
@@ -94,7 +94,12 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 
 					if (phnd.isValid() && vhnd.isValid() && ihnd.isValid() && phshnd.isValid() && mhnd.isValid()) {
 
-						GA_Size ngdpoints = gdp->getNumPoints();
+						const GA_Size ngdpoints = gdp->getNumPoints();
+						if (ngdpoints > nvdata->getMaxPtsCount()) {
+							addError(obj, SIM_BADSUBDATA, "Geometry pointcount exceeds maximum pointcound allocated by NvData!", UT_ERROR_ABORT);
+							continue;
+						}
+
 						bool reget = false;
 						if (nactives < ngdpoints) {
 							int nptscount = NvFlexExtAllocParticles(consolv->container(), ngdpoints - nactives, indices); //whoa! carefull with that! your luck the mapped buffer is not reallocated during this operation!

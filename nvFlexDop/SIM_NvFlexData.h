@@ -262,8 +262,11 @@ protected:
 	void initializeSubclass();
 	void makeEqualSubclass(const SIM_Data* source);
 
+	void setParametersSubclass(const SIM_Options & parms);
+
 private:
 	bool _valid;
+	int64 _prevMaxPts;
 private: //for a friend
 	std::shared_ptr<int> _indices;
 	int64 _lastGdpPId,_lastGdpTId,_lastGdpStrId;

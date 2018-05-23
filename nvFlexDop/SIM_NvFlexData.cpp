@@ -29,23 +29,7 @@ void SIM_NvFlexData::initializeSubclass() {
 	_lastGdpPId = -1;
 	_lastGdpTId = -1;
 
-	int ptsmaxcount = getMaxPtsCount();
 	
-	try {
-		acquireCudaContext();
-		nvdata.reset(new NvFlexContainerWrapper(SIM_NvFlexData::nvFlexLibrary, ptsmaxcount, 0));
-		releaseCudaContext();
-		_indices.reset(new int[ptsmaxcount]);
-	}
-	catch (...) {
-		std::cout << "nvflex data initialization failed!" << std::endl;
-		_valid = false;
-		nvdata.reset();
-		_indices.reset();
-		return;
-	}
-
-	std::cout << "nvflex data initialized with " << ptsmaxcount << std::endl;
 
 	//debug test
 	/*float sizex = 1.76f;
@@ -65,6 +49,30 @@ void SIM_NvFlexData::initializeSubclass() {
 	*/
 
 	//NvFlexExtUnmapParticleData(nvdata->container());
+}
+
+void SIM_NvFlexData::setParametersSubclass(const SIM_Options & parms) {
+	// we dont care what option was set for now, we have only one
+	SIM_Data::setParametersSubclass(parms);
+	
+	int ptsmaxcount = getMaxPtsCount();
+	if (_prevMaxPts == ptsmaxcount)return;
+
+	try {
+		acquireCudaContext();
+		nvdata.reset(new NvFlexContainerWrapper(SIM_NvFlexData::nvFlexLibrary, ptsmaxcount, 0));
+		releaseCudaContext();
+		_indices.reset(new int[ptsmaxcount]);
+	}
+	catch (...) {
+		std::cout << "nvflex data initialization failed!" << std::endl;
+		_valid = false;
+		nvdata.reset();
+		_indices.reset();
+		return;
+	}
+	_prevMaxPts = ptsmaxcount;
+	std::cout << "nvflex data initialized with " << ptsmaxcount << std::endl;
 }
 
 void SIM_NvFlexData::makeEqualSubclass(const SIM_Data* source) {
@@ -130,7 +138,7 @@ void delete_NvFlexContainerWrapper(SIM_NvFlexData::NvFlexContainerWrapper *wrp) 
 }
 
 
-SIM_NvFlexData::SIM_NvFlexData(const SIM_DataFactory*fack):SIM_Data(fack),SIM_OptionsUser(this), _indices(nullptr_t(), std::default_delete<int[]>()), nvdata(nullptr_t(), delete_NvFlexContainerWrapper), _lastGdpPId(-1), _lastGdpTId(-1), _lastGdpStrId(-1), _valid(false){
+SIM_NvFlexData::SIM_NvFlexData(const SIM_DataFactory*fack):SIM_Data(fack),SIM_OptionsUser(this), _indices(nullptr_t(), std::default_delete<int[]>()), nvdata(nullptr_t(), delete_NvFlexContainerWrapper), _lastGdpPId(-1), _lastGdpTId(-1), _lastGdpStrId(-1), _prevMaxPts(-1), _valid(false){
 	if (nvFlexLibrary != NULL)_valid = true;
 	std::cout << "flex data constructed." << std::endl;
 }
@@ -172,12 +180,12 @@ NvFlexHLibraryHolder::~NvFlexHLibraryHolder() {
 	if (_instanceCount == 0) {
 		//no, lets assume that we need to have proper context by this time for it to be properly released
 		// and lets assume that NvFlexShutdown restores previous context
-		//while (releaseCudaContext()) {};//release all cuda contexts
-		//NvFlexAcquireContext(nvFlexLibrary);
+		while (releaseCudaContext()) {};//release all cuda contexts
+		NvFlexAcquireContext(nvFlexLibrary);
 		NvFlexShutdown(nvFlexLibrary);
 		nvFlexLibrary = NULL;
-		//cudaContextAcquiredCount = 0;
-		//NvFlexDeviceDestroyCudaContext();
+		cudaContextAcquiredCount = 0;
+		NvFlexDeviceDestroyCudaContext();
 		std::cout << "flex library destroyed" << std::endl;
 	}
 }
