@@ -88,6 +88,7 @@ void SIM_NvFlexData::makeEqualSubclass(const SIM_Data* source) {
 	_indices = src->_indices;
 	_lastGdpPId = src->_lastGdpPId;
 	_lastGdpTId = src->_lastGdpTId;
+	_prevMaxPts = src->_prevMaxPts;
 	_valid = _valid && src->_valid;
 	if (!_valid) {
 		std::cout << "makeEqual data was invalid" << std::endl;
@@ -186,6 +187,7 @@ NvFlexHLibraryHolder::~NvFlexHLibraryHolder() {
 		nvFlexLibrary = NULL;
 		cudaContextAcquiredCount = 0;
 		NvFlexDeviceDestroyCudaContext();
+		cudaContextCreated = false;
 		std::cout << "flex library destroyed" << std::endl;
 	}
 }
