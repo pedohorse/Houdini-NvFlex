@@ -5,6 +5,15 @@
 #include <NvFlexDevice.h>
 
 
+static void log(unsigned short level, const char* fmt, ...) {
+	if (level > 999)return;
+	va_list args;
+	va_start(args, fmt);
+	std::vfprintf(stderr, fmt, args);
+	std::fflush(stderr);
+	va_end(args);
+}
+
 
 static void CreateFluidParticleGrid(NvFlexExtParticleData& ptd, int* indices, Vec3 lower, int dimx, int dimy, int dimz, float radius, Vec3 velocity, float invMass, int phase, float jitter = 0.005f);
 
@@ -65,23 +74,23 @@ void SIM_NvFlexData::setParametersSubclass(const SIM_Options & parms) {
 		_indices.reset(new int[ptsmaxcount]);
 	}
 	catch (...) {
-		std::cout << "nvflex data initialization failed!" << std::endl;
+		log(1, "nvflex data initialization failed!\n");
 		_valid = false;
 		nvdata.reset();
 		_indices.reset();
 		return;
 	}
 	_prevMaxPts = ptsmaxcount;
-	std::cout << "nvflex data initialized with " << ptsmaxcount << std::endl;
+	log(5, "nvflex data initialized with %d\n", ptsmaxcount);
 }
 
 void SIM_NvFlexData::makeEqualSubclass(const SIM_Data* source) {
 	SIM_Data::makeEqualSubclass(source);
-	std::cout << "do makeEqual" << std::endl;
+	log(6, "do makeEqual");
 	const SIM_NvFlexData* src = SIM_DATA_CASTCONST(source, SIM_NvFlexData);
 	if (src == NULL) {
 		// some info?
-		std::cout << "makeEqual src==Null" << std::endl;
+		log(6, "makeEqual src==Null\n");
 		return;
 	}
 	nvdata = src->nvdata;
@@ -91,7 +100,7 @@ void SIM_NvFlexData::makeEqualSubclass(const SIM_Data* source) {
 	_prevMaxPts = src->_prevMaxPts;
 	_valid = _valid && src->_valid;
 	if (!_valid) {
-		std::cout << "makeEqual data was invalid" << std::endl;
+		log(6, "makeEqual data was invalid\n");;
 		nvdata.reset();
 		_indices.reset();
 	}
@@ -141,12 +150,12 @@ void delete_NvFlexContainerWrapper(SIM_NvFlexData::NvFlexContainerWrapper *wrp) 
 
 SIM_NvFlexData::SIM_NvFlexData(const SIM_DataFactory*fack):SIM_Data(fack),SIM_OptionsUser(this), _indices(nullptr_t(), std::default_delete<int[]>()), nvdata(nullptr_t(), delete_NvFlexContainerWrapper), _lastGdpPId(-1), _lastGdpTId(-1), _lastGdpStrId(-1), _prevMaxPts(-1), _valid(false){
 	if (nvFlexLibrary != NULL)_valid = true;
-	std::cout << "flex data constructed." << std::endl;
+	log(5, "flex data constructed.\n");
 }
 
 
 SIM_NvFlexData::~SIM_NvFlexData(){
-	std::cout << "flex data destructed." << std::endl;
+	log(5, "flex data destructed.\n");
 }
 
 
@@ -161,7 +170,10 @@ NvFlexHLibraryHolder::NvFlexHLibraryHolder() {
 	++_instanceCount;
 	if (nvFlexLibrary == NULL) {
 		if (!cudaContextCreated) {
-			if (!NvFlexDeviceCreateCudaContext(NvFlexDeviceGetSuggestedOrdinal()))throw std::runtime_error("Cannot initialize Cuda Context");
+			if (!NvFlexDeviceCreateCudaContext(NvFlexDeviceGetSuggestedOrdinal())) {
+				log(0, "Failed to initialize Cuda Context\n");
+				throw std::runtime_error("Failed to initialize Cuda Context");
+			}
 			cudaContextCreated = true;
 		}
 		NvFlexInitDesc desc;
@@ -170,14 +182,25 @@ NvFlexHLibraryHolder::NvFlexHLibraryHolder() {
 		desc.renderDevice = NULL;
 		desc.renderContext = NULL;
 		desc.computeType = NvFlexComputeType::eNvFlexCUDA;
-		nvFlexLibrary = NvFlexInit(110, &nvFlexErrorCallbackPrint,&desc);
-		std::cout << "flex library initialized" << std::endl;
+		bool flexFailed = false;
+		try {
+			nvFlexLibrary = NvFlexInit(110, &nvFlexErrorCallbackPrint, &desc);
+		}
+		catch (...) { flexFailed = true; }
+		if (nvFlexLibrary == NULL)flexFailed = true;
+
+		if (flexFailed) {
+			log(0, "Failed to initialize Flex library\n");
+			throw std::runtime_error("Failed to initialize Flex library");
+		}
+
+		log(5, "flex library initialized\n");
 	}
-	std::cout << "libhld: instancecount: " << _instanceCount << std::endl;
+	log(5, "libhld: instancecount: %d\n",  _instanceCount);
 }
 NvFlexHLibraryHolder::~NvFlexHLibraryHolder() {
 	--_instanceCount;
-	std::cout << "libhld: instancecount: " << _instanceCount << std::endl;
+	log(5, "libhld: instancecount: %d\n", _instanceCount);
 	if (_instanceCount == 0) {
 		//no, lets assume that we need to have proper context by this time for it to be properly released
 		// and lets assume that NvFlexShutdown restores previous context
@@ -188,7 +211,7 @@ NvFlexHLibraryHolder::~NvFlexHLibraryHolder() {
 		cudaContextAcquiredCount = 0;
 		NvFlexDeviceDestroyCudaContext();
 		cudaContextCreated = false;
-		std::cout << "flex library destroyed" << std::endl;
+		log(5, "flex library destroyed\n");
 	}
 }
 
