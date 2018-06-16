@@ -16,6 +16,13 @@ just add your folder to the end of the **PATH** variable. So with example folder
 
 That should do it.
 
+
+If you encounter problems, like houdini crashes on startup or plugin not working in general: try [this work in progress branch](https://github.com/pedohorse/Houdini-NvFlex/tree/work-in-progress)
+
+it will at least print out the problem into the console
+
+If the plugin does not load and no console message is printed, but houdini itself launches - you probably forgot to make some of dlls from the **bin** folder available (see pt.3 of installation guide, and make sure you have microsoft vc 2015 redistributable installed (it would be fun if you don't cuz houdini needs it to launch as well))
+
 ## Examples
 
 please, see hip files in **examples** folder
