@@ -63,6 +63,7 @@ void SIM_NvFlexData::initializeSubclass() {
 void SIM_NvFlexData::setParametersSubclass(const SIM_Options & parms) {
 	// we dont care what option was set for now, we have only one
 	SIM_Data::setParametersSubclass(parms);
+	// IMOIRTANT: if you add at least one more parameter to data - the below code must only be executed in case of ptsmaxcount parameter change
 	
 	int ptsmaxcount = getMaxPtsCount();
 	if (_prevMaxPts == ptsmaxcount)return;
@@ -86,7 +87,7 @@ void SIM_NvFlexData::setParametersSubclass(const SIM_Options & parms) {
 
 void SIM_NvFlexData::makeEqualSubclass(const SIM_Data* source) {
 	SIM_Data::makeEqualSubclass(source);
-	log(6, "do makeEqual");
+	//log(6, "do makeEqual\n");
 	const SIM_NvFlexData* src = SIM_DATA_CASTCONST(source, SIM_NvFlexData);
 	if (src == NULL) {
 		// some info?
