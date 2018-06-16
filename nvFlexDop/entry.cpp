@@ -2,10 +2,12 @@
 
 #include "SIM_NvFlexData.h"
 #include "SIM_NvFlexSolver.h"
+#include <NvFlexDevice.h>
 
 
 void initializeSIM(void*) {
 	try { //some useless error handling
+		if (NvFlexDeviceGetSuggestedOrdinal() == -1)throw std::runtime_error("CUDA device not found!");
 		IMPLEMENT_DATAFACTORY(SIM_NvFlexData);
 		IMPLEMENT_DATAFACTORY(SIM_NvFlexSolver);
 	}

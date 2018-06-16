@@ -171,11 +171,22 @@ NvFlexHLibraryHolder::NvFlexHLibraryHolder() {
 	++_instanceCount;
 	if (nvFlexLibrary == NULL) {
 		if (!cudaContextCreated) {
-			if (!NvFlexDeviceCreateCudaContext(NvFlexDeviceGetSuggestedOrdinal())) {
-				log(0, "Failed to initialize Cuda Context\n");
-				throw std::runtime_error("Failed to initialize Cuda Context");
+			try {
+				int cdevice = NvFlexDeviceGetSuggestedOrdinal();
+				if (cdevice == -1) {
+					log(0, "No Cuda device found ! \n");
+					throw std::runtime_error("Failed to initialize Cuda Context");
+				}
+				if (!NvFlexDeviceCreateCudaContext(cdevice)) {
+					log(0, "Failed to initialize Cuda Context\n");
+					throw std::runtime_error("Failed to initialize Cuda Context");
+				}
+				cudaContextCreated = true;
 			}
-			cudaContextCreated = true;
+			catch (...) {
+				log(0, "Critical Error !\n");
+				throw;
+			}
 		}
 		NvFlexInitDesc desc;
 		desc.deviceIndex = 0; // ignored, device index is set by the context
