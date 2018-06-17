@@ -1,4 +1,5 @@
 #pragma once
+#include <sys/SYS_Types.h>
 #include <NvFlex.h>
 #include <NvFlexExt.h>
 #include <../core/maths.h>
@@ -32,8 +33,6 @@ public:
 
 typedef NvFlexHCollisionGeometryWrapper<NvFlexSphereGeometry> NvfSphereGeo;
 typedef NvFlexHCollisionGeometryWrapper<NvFlexHTriangleMesh> NvfTrimeshGeo;
-
-typedef long long int64;
 
 class NvFlexHCollisionData
 {
