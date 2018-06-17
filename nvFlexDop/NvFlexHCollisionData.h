@@ -34,8 +34,7 @@ public:
 typedef NvFlexHCollisionGeometryWrapper<NvFlexSphereGeometry> NvfSphereGeo;
 typedef NvFlexHCollisionGeometryWrapper<NvFlexHTriangleMesh> NvfTrimeshGeo;
 
-class NvFlexHCollisionData
-{
+class NvFlexHCollisionData {
 public:
 	NvFlexHCollisionData(NvFlexLibrary*lib);
 	NvFlexHCollisionData(const NvFlexHCollisionData&) = delete;
