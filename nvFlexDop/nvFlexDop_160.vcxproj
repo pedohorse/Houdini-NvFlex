@@ -23,6 +23,7 @@
     <ClInclude Include="NvFlexHTriangleMesh.h" />
     <ClInclude Include="SIM_NvFlexData.h" />
     <ClInclude Include="SIM_NvFlexSolver.h" />
+    <ClInclude Include="utils.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="entry.cpp" />
@@ -30,6 +31,7 @@
     <ClCompile Include="NvFlexHTriangleMesh.cpp" />
     <ClCompile Include="SIM_NvFlexData.cpp" />
     <ClCompile Include="SIM_NvFlexSolver.cpp" />
+    <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{1953D92A-F373-4DB2-B03B-51B70F7662F0}</ProjectGuid>
