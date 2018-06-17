@@ -87,7 +87,7 @@ NvfTrimeshGeo NvFlexHCollisionData::getTriangleMesh(const std::string &key) {
 }
 
 
-int NvFlexHCollisionData::size()const {
+int NvFlexHCollisionData::size() const {
 	return colgeovec.size();
 }
 
@@ -119,7 +119,7 @@ void NvFlexHCollisionData::unmapall() {
 	flagvec.unmap();
 }
 
-void NvFlexHCollisionData::setCollisionData(NvFlexSolver * solv){
+void NvFlexHCollisionData::setCollisionData(NvFlexSolver * solv) {
 	NvFlexSetShapes(solv, colgeovec.buffer, positionvec.buffer, rotationvec.buffer, prevpositionvec.buffer, prevrotationvec.buffer, flagvec.buffer, flagvec.size());
 }
 
@@ -132,8 +132,7 @@ void NvFlexHCollisionData::resizeall(int newsize) {
 	flagvec.resize(newsize);
 }
 
-NvFlexHCollisionData::NvFlexHCollisionData(NvFlexLibrary *lib):colgeovec(lib), positionvec(lib), rotationvec(lib), prevpositionvec(lib), prevrotationvec(lib), flagvec(lib)
-{
+NvFlexHCollisionData::NvFlexHCollisionData(NvFlexLibrary *lib):colgeovec(lib), positionvec(lib), rotationvec(lib), prevpositionvec(lib), prevrotationvec(lib), flagvec(lib) {
 	colgeovec.resize(0);
 	positionvec.resize(0);
 	rotationvec.resize(0);
@@ -144,8 +143,7 @@ NvFlexHCollisionData::NvFlexHCollisionData(NvFlexLibrary *lib):colgeovec(lib), p
 }
 
 
-NvFlexHCollisionData::~NvFlexHCollisionData()
-{
+NvFlexHCollisionData::~NvFlexHCollisionData() {
 	for (auto it = meshmap.begin(); it != meshmap.end(); ++it) {
 		delete it->second;
 	}

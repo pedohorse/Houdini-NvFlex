@@ -140,7 +140,7 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 				//NOW PRIMITIVES
 
 				GA_Size nprims = gdp->getNumPrimitives();
-				if(nprims>0){//Create and Push SPRINGS and TRIANGLES and RIGIDS
+				if(nprims>0) {//Create and Push SPRINGS and TRIANGLES and RIGIDS
 					GA_ROHandleF rlhnd(gdp->findPrimitiveAttribute("restlength"));
 					GA_ROHandleF sthnd(gdp->findPrimitiveAttribute("strength"));
 					//--
@@ -353,7 +353,7 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 
 				std::string objidname = std::to_string(aff->getObjectId());
 
-				if(pDataId != colldata->getStoredHash(objidname)){
+				if(pDataId != colldata->getStoredHash(objidname)) {
 					messageLog(5, "updating collision mesh %s\n", objidname.c_str());
 					colldata->setStoredHash(objidname, pDataId);
 					colldata->addTriangleMesh(objidname);
@@ -766,6 +766,6 @@ const SIM_DopDescription* SIM_NvFlexSolver::getDescriptionForFucktory() {
 }
 
 
-SIM_NvFlexSolver::SIM_NvFlexSolver(const SIM_DataFactory * fack) :SIM_Solver(fack), SIM_OptionsUser(this){}
+SIM_NvFlexSolver::SIM_NvFlexSolver(const SIM_DataFactory * fack) :SIM_Solver(fack), SIM_OptionsUser(this) {}
 
-SIM_NvFlexSolver::~SIM_NvFlexSolver(){}
+SIM_NvFlexSolver::~SIM_NvFlexSolver() {}

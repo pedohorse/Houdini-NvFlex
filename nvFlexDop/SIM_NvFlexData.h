@@ -37,14 +37,14 @@ public:
 			float* const springRls;
 			float* const springSts;
 
-			NvFlexHSpringData(int*sid, float*srl, float*sts):springIds(sid),springRls(srl),springSts(sts){}
+			NvFlexHSpringData(int*sid, float*srl, float*sts):springIds(sid),springRls(srl),springSts(sts) {}
 		} NvFlexHSpringData;
 
 		typedef struct NvFlexHTriangleData {
 			int* const triangleIds;
 			float* const triangleNms;
 
-			NvFlexHTriangleData(int*tid, float*tnm):triangleIds(tid),triangleNms(tnm){}
+			NvFlexHTriangleData(int*tid, float*tnm):triangleIds(tid),triangleNms(tnm) {}
 		} NvFlexHTriangleData;
 
 		typedef struct NvFlexHRigidData {
@@ -104,7 +104,7 @@ public:
 			_springRestLengths.unmap();
 			_springStrenghts.unmap();
 		}
-		NvFlexHSpringData mapSpringData(){
+		NvFlexHSpringData mapSpringData() {
 			_springIndices.map();
 			_springRestLengths.map();
 			_springStrenghts.map();
