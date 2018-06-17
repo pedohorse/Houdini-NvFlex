@@ -44,17 +44,17 @@ public:
 	~NvFlexHCollisionData();
 
 
-	bool hasKey(std::string key);
-	int64 getStoredHash(std::string key);
-	bool setStoredHash(std::string key, int64 hash);
+	bool hasKey(const std::string &key);
+	int64 getStoredHash(const std::string &key);
+	bool setStoredHash(const std::string &key, const int64 hash);
 	//add-remove shit
-	bool removeItem(std::string key);
+	bool removeItem(const std::string &key);
 
-	bool addSphere(std::string key);
-	NvfSphereGeo getSphere(std::string key);
+	bool addSphere(const std::string &key);
+	NvfSphereGeo getSphere(const std::string &key);
 
-	bool addTriangleMesh(std::string key);
-	NvfTrimeshGeo getTriangleMesh(std::string key);
+	bool addTriangleMesh(const std::string &key);
+	NvfTrimeshGeo getTriangleMesh(const std::string &key);
 	//
 	int size() const;
 
