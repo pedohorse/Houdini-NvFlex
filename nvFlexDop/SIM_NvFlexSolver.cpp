@@ -1,9 +1,3 @@
-
-
-#include "SIM_NvFlexSolver.h"
-
-#include "SIM_NvFlexData.h" //for static library
-
 #include <SIM/SIM_ObjectArray.h>
 #include <SIM/SIM_Object.h>
 #include <SIM/SIM_GeometryCopy.h>
@@ -19,30 +13,12 @@
 
 #include <algorithm>
 
-#include "NvFlexHTriangleMesh.h"
-
 #include <NvFlexDevice.h>
 
-static void nvFlexErrorCallbackPrint(NvFlexErrorSeverity type, const char *msg, const char *file, int line) {
-	switch (type) {
-	case eNvFlexLogError:
-		std::cout << "NvF ERROR: "; break;
-	case eNvFlexLogWarning:
-		std::cout << "NvF WARNING: "; break;
-	case eNvFlexLogDebug:
-		std::cout << "NvF DEBUG: "; break;
-	case eNvFlexLogAll:
-		std::cout << "NvF ALL: "; break;
-	}
-	if (msg != NULL)std::cout << msg;
-	std::cout << " :: ";
-	if (file != NULL)std::cout << file;
-	std::cout << " :: ";
-	std::cout << line;
-	std::cout << std::endl;
-
-}
-
+#include "utils.h"
+#include "NvFlexHTriangleMesh.h"
+#include "SIM_NvFlexData.h" //for static library
+#include "SIM_NvFlexSolver.h"
 
 SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine & engine, SIM_ObjectArray & objs, SIM_ObjectArray & newobjs, SIM_ObjectArray & feedbackobjs, const SIM_Time & timestep)
 {
@@ -75,9 +51,9 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 				const GU_Detail *gdp = lock.getGdp();
 				int64 ndid = gdp->getP()->getDataId();
 				int64 ntopdid = gdp->getTopology().getDataId();
-				std::cout << "id = " << ndid << std::endl;
+				messageLog(5, "P data id = %lld\n", ndid);
 				if (ndid != nvdata->_lastGdpPId || ntopdid != nvdata->_lastGdpTId) {
-					std::cout << "found geo, new id !! old P id: " << nvdata->_lastGdpPId << ". old topo id:" << nvdata->_lastGdpTId << std::endl;
+					messageLog(5, "found geo, new id !! old P id: %lld. old topo id: %lld\n", nvdata->_lastGdpPId, nvdata->_lastGdpTId);
 
 					//we just search for attribs, not creating them cuz for now we work with RO geometry
 
@@ -206,9 +182,12 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 								else if (vtxcount == 3)++totaltricount;
 							}
 						}
-						consolv->resizeSpringData(totalspringcount);  std::cout << "total springs count: " << totalspringcount << std::endl;
-						consolv->resizeTriangleData(totaltricount);  std::cout << "total triangles count: " << totaltricount << std::endl;
-						consolv->resizeRigidData(totalrigidcount, rgdPrimSizes);  std::cout << "total rigids count: " << totalrigidcount << std::endl;
+						consolv->resizeSpringData(totalspringcount);
+						consolv->resizeTriangleData(totaltricount);
+						consolv->resizeRigidData(totalrigidcount, rgdPrimSizes);
+						messageLog(5, "total springs count: %lld\n", totalspringcount);
+						messageLog(5, "total triangles count: %lld\n", totaltricount);
+						messageLog(5, "total rigids count: %lld\n", totalrigidcount);
 
 						auto sprdat = consolv->mapSpringData();
 						auto tridat = consolv->mapTriangleData();
@@ -365,7 +344,6 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 			for (exint afi = 0; afi < affs.entries(); ++afi) {
 				const SIM_Object* aff = affs(afi);
 				if (aff == obj)continue;
-				//std::cout << aff->getName() << " : " << aff->getObjectId() << std::endl;
 				const SIM_Geometry*affgeo = SIM_DATA_GETCONST(*aff, SIM_GEOMETRY_DATANAME, SIM_Geometry);
 				if (affgeo == NULL)continue;
 
@@ -376,7 +354,7 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 				std::string objidname = std::to_string(aff->getObjectId());
 
 				if(pDataId != colldata->getStoredHash(objidname)){
-					std::cout << "updating collision mesh " << objidname << std::endl;
+					messageLog(5, "updating collision mesh %s\n", objidname.c_str());
 					colldata->setStoredHash(objidname, pDataId);
 					colldata->addTriangleMesh(objidname);
 					NvfTrimeshGeo trigeo=colldata->getTriangleMesh(objidname);
@@ -461,7 +439,7 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 		NvFlexSetParams(consolv->solver(), &nvparams);
 
 		//NvFlexExtTickContainer(consolv->container(), timestep, substeps, false);
-		std::cout << "timestep " << timestep << std::endl;
+		messageLog(5, "timestep %f\n", timestep);
 		NvFlexUpdateSolver(consolv->solver(), timestep, substeps, false);
 
 		NvFlexExtPullFromDevice(consolv->container());
@@ -479,7 +457,7 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 			const bool recreateGeo = nactives != gdp->getNumPoints(); //This basically should never happen with current workflow
 
 			if (recreateGeo) {
-				std::cout << "recreate==true. geo inconsistent. " << nactives << " vs " << gdp->getNumPoints() << std::endl;
+				messageLog(1, "recreate==true. geo inconsistent. %d vs %lld\n", nactives, gdp->getNumPoints());
 			}
 
 			if(recreateGeo)gdp->stashAll();

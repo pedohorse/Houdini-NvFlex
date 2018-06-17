@@ -3,6 +3,7 @@
 #include "SIM_NvFlexData.h"
 #include "SIM_NvFlexSolver.h"
 #include <NvFlexDevice.h>
+#include "utils.h"
 
 
 void initializeSIM(void*) {
@@ -12,9 +13,9 @@ void initializeSIM(void*) {
 		IMPLEMENT_DATAFACTORY(SIM_NvFlexSolver);
 	}
 	catch (std::runtime_error &e) {
-		std::cout << "OMEGA ERROR: "<< e.what() <<" !\nnvFlex is not loaded!\n" << std::endl;
+		messageLog(0, "OMEGA ERROR: %s !\nnvFlex is not loaded!\n",e.what());
 	}
 	catch (...) {
-		std::cout << "UNKNOWN OMEGA ERROR ! nvFlex is not loaded!\n" << std::endl;
+		messageLog(0, "UNKNOWN OMEGA ERROR ! nvFlex is not loaded!\n");
 	}
 }
