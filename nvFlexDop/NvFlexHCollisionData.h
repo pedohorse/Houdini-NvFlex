@@ -13,12 +13,22 @@
 
 template <class T>
 class NvFlexHCollisionGeometryWrapper {
-public:
+public: //TOTHINK: do we want to keep everything exposed?
 	T* collgeo;
 	Vec4* position;
 	Quat* rotation;
 	Vec4* prevposition;
 	Quat* prevrotation;
+
+	void updatePosition(const Vec4 & newPos) {
+		*prevposition = *position;
+		*position = newPos;
+	}
+
+	void updateRotation(const Quat & newRot) {
+		*prevrotation = *rotation;
+		*rotation = newRot;
+	}
 
 	NvFlexHCollisionGeometryWrapper(T* cg, Vec4* p, Quat* r, Vec4* pp, Quat* pr) {
 		collgeo = cg;
