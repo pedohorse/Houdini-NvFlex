@@ -2,11 +2,11 @@
 #include "NvFlexHTriangleMesh.h"
 
 
-bool NvFlexHCollisionData::hasKey(std::string key) {
+bool NvFlexHCollisionData::hasKey(const std::string &key) const {
 	return collmap.find(key) != collmap.end();
 }
 
-bool NvFlexHCollisionData::removeItem(std::string key) {
+bool NvFlexHCollisionData::removeItem(const std::string &key) {
 	// buffers must be mapped!
 	if (!hasKey(key))return false;
 	int id = collmap.at(key);
@@ -34,7 +34,7 @@ bool NvFlexHCollisionData::removeItem(std::string key) {
 	return true;
 }
 
-bool NvFlexHCollisionData::addSphere(std::string key) {
+bool NvFlexHCollisionData::addSphere(const std::string &key) {
 	// buffers must be mapped!
 	if (hasKey(key))return false;
 	int oldsize = colgeovec.size();
@@ -48,14 +48,14 @@ bool NvFlexHCollisionData::addSphere(std::string key) {
 	return true;
 }
 
-NvfSphereGeo NvFlexHCollisionData::getSphere(std::string key) {
+NvfSphereGeo NvFlexHCollisionData::getSphere(const std::string &key) const {
 	// buffers must be mapped!
 	if (!hasKey(key))return NvfSphereGeo();
-	int offset = collmap.at(key);
+	const int offset = collmap.at(key);
 	return NvfSphereGeo((NvFlexSphereGeometry*)(colgeovec.mappedPtr + offset), positionvec.mappedPtr + offset, rotationvec.mappedPtr + offset, prevpositionvec.mappedPtr + offset, prevrotationvec.mappedPtr + offset);
 }
 
-bool NvFlexHCollisionData::addTriangleMesh(std::string key) {
+bool NvFlexHCollisionData::addTriangleMesh(const std::string &key) {
 	// buffers must be mapped!
 	if (hasKey(key))return false;
 	int oldsize = colgeovec.size();
@@ -78,25 +78,25 @@ bool NvFlexHCollisionData::addTriangleMesh(std::string key) {
 	return true;
 }
 
-NvfTrimeshGeo NvFlexHCollisionData::getTriangleMesh(std::string key) {
+NvfTrimeshGeo NvFlexHCollisionData::getTriangleMesh(const std::string &key) const {
 	// buffers must be mapped!
 	if (!hasKey(key))return NvfTrimeshGeo();
-	int offset = collmap.at(key);
+	const int offset = collmap.at(key);
 	NvFlexTriangleMeshId mid = colgeovec[offset].triMesh.mesh;
 	return NvfTrimeshGeo(meshmap.at(mid), positionvec.mappedPtr + offset, rotationvec.mappedPtr + offset, prevpositionvec.mappedPtr + offset, prevrotationvec.mappedPtr + offset);
 }
 
 
-int NvFlexHCollisionData::size()const {
+int NvFlexHCollisionData::size() const {
 	return colgeovec.size();
 }
 
-int64 NvFlexHCollisionData::getStoredHash(std::string key) {
+int64 NvFlexHCollisionData::getStoredHash(const std::string &key) {
 	if (!hasKey(key))return -2;
 	return hashmap.at(key);
 }
 
-bool NvFlexHCollisionData::setStoredHash(std::string key, int64 hash) {
+bool NvFlexHCollisionData::setStoredHash(const std::string &key, const int64 hash) {
 	if (!hasKey(key))return false;
 	hashmap[key] = hash;
 	return true;
@@ -119,7 +119,7 @@ void NvFlexHCollisionData::unmapall() {
 	flagvec.unmap();
 }
 
-void NvFlexHCollisionData::setCollisionData(NvFlexSolver * solv){
+void NvFlexHCollisionData::setCollisionData(NvFlexSolver * solv) {
 	NvFlexSetShapes(solv, colgeovec.buffer, positionvec.buffer, rotationvec.buffer, prevpositionvec.buffer, prevrotationvec.buffer, flagvec.buffer, flagvec.size());
 }
 
@@ -132,8 +132,7 @@ void NvFlexHCollisionData::resizeall(int newsize) {
 	flagvec.resize(newsize);
 }
 
-NvFlexHCollisionData::NvFlexHCollisionData(NvFlexLibrary *lib):colgeovec(lib), positionvec(lib), rotationvec(lib), prevpositionvec(lib), prevrotationvec(lib), flagvec(lib)
-{
+NvFlexHCollisionData::NvFlexHCollisionData(NvFlexLibrary *lib):colgeovec(lib), positionvec(lib), rotationvec(lib), prevpositionvec(lib), prevrotationvec(lib), flagvec(lib) {
 	colgeovec.resize(0);
 	positionvec.resize(0);
 	rotationvec.resize(0);
@@ -144,8 +143,7 @@ NvFlexHCollisionData::NvFlexHCollisionData(NvFlexLibrary *lib):colgeovec(lib), p
 }
 
 
-NvFlexHCollisionData::~NvFlexHCollisionData()
-{
+NvFlexHCollisionData::~NvFlexHCollisionData() {
 	for (auto it = meshmap.begin(); it != meshmap.end(); ++it) {
 		delete it->second;
 	}

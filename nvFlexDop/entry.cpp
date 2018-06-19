@@ -3,10 +3,23 @@
 #include "SIM_NvFlexData.h"
 #include "SIM_NvFlexSolver.h"
 #include <NvFlexDevice.h>
+#include <stdlib.h>
+#include <climits>
 #include "utils.h"
 
 
 void initializeSIM(void*) {
+	//init logging:
+	const char* envar = std::getenv("NVFLEX_VERBOSITY_LEVEL");
+	if (envar != NULL) {
+		char** end;
+		long lerrlvl = strtol(envar, end, 10);
+		short errlvl = 0;
+		if (lerrlvl > SHRT_MAX)errlvl = SHRT_MAX;
+		else if (lerrlvl < 0)errlvl = 0;
+		else errlvl = (short)lerrlvl;
+		setMessageLogLevel(errlvl);
+	}
 	try { //some useless error handling
 		if (NvFlexDeviceGetSuggestedOrdinal() == -1)throw std::runtime_error("CUDA device not found!");
 		IMPLEMENT_DATAFACTORY(SIM_NvFlexData);

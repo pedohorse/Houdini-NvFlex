@@ -1,5 +1,6 @@
 #include <SIM/SIM_ObjectArray.h>
 #include <SIM/SIM_Object.h>
+#include <SIM/SIM_Position.h>
 #include <SIM/SIM_GeometryCopy.h>
 #include <SIM/SIM_ForceGravity.h>
 #include <GU/GU_Detail.h>
@@ -50,10 +51,16 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 				int nactives = -1;
 				const GU_Detail *gdp = lock.getGdp();
 				int64 ndid = gdp->getP()->getDataId();
+				int64 nvdid = -1;
+				{
+					const GA_Attribute* vattr=gdp->findPointAttribute("v");
+					if (vattr != NULL) nvdid = vattr->getDataId();
+				}
+				
 				int64 ntopdid = gdp->getTopology().getDataId();
 				messageLog(5, "P data id = %lld\n", ndid);
-				if (ndid != nvdata->_lastGdpPId || ntopdid != nvdata->_lastGdpTId) {
-					messageLog(5, "found geo, new id !! old P id: %lld. old topo id: %lld\n", nvdata->_lastGdpPId, nvdata->_lastGdpTId);
+				if (ndid != nvdata->_lastGdpPId || nvdid != nvdata->_lastGdpVId || ntopdid != nvdata->_lastGdpTId) {
+					messageLog(5, "found geo, new id !! old P id: %lld. old v id: %lld. old topo id: %lld\n", nvdata->_lastGdpPId, nvdata->_lastGdpVId, nvdata->_lastGdpTId);
 
 					//we just search for attribs, not creating them cuz for now we work with RO geometry
 
@@ -140,7 +147,7 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 				//NOW PRIMITIVES
 
 				GA_Size nprims = gdp->getNumPrimitives();
-				if(nprims>0){//Create and Push SPRINGS and TRIANGLES and RIGIDS
+				if(nprims>0) {//Create and Push SPRINGS and TRIANGLES and RIGIDS
 					GA_ROHandleF rlhnd(gdp->findPrimitiveAttribute("restlength"));
 					GA_ROHandleF sthnd(gdp->findPrimitiveAttribute("strength"));
 					//--
@@ -347,15 +354,15 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 				const SIM_Geometry*affgeo = SIM_DATA_GETCONST(*aff, SIM_GEOMETRY_DATANAME, SIM_Geometry);
 				if (affgeo == NULL)continue;
 
+				std::string objidname = std::to_string(aff->getObjectId());
+				
 				GU_DetailHandleAutoReadLock hlk(affgeo->getGeometry());
 				const GU_Detail *gdp = hlk.getGdp();
 				int64 pDataId=gdp->getP()->getDataId();
-
-				std::string objidname = std::to_string(aff->getObjectId());
-
-				if(pDataId != colldata->getStoredHash(objidname)){
+								
+				if(pDataId != colldata->getStoredHash(objidname)) { //TODO: why why why have i ever desiced to use strings for keys??? there must have been a reason, right?
 					messageLog(5, "updating collision mesh %s\n", objidname.c_str());
-					colldata->setStoredHash(objidname, pDataId);
+					colldata->setStoredHash(objidname, pDataId); 
 					colldata->addTriangleMesh(objidname);
 					NvfTrimeshGeo trigeo=colldata->getTriangleMesh(objidname);
 
@@ -410,6 +417,20 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 					}
 
 				}
+
+				//update aff position
+				const SIM_Position* affpos = aff->getPosition();
+				if (affpos != NULL) {
+					UT_Vector3 pos = affpos->selfToWorld(UT_Vector3()); // not with getpos cuz there is shitty pivot, so its less code just to do like this.
+					UT_Quaternion rot;
+					affpos->getOrientation(rot);
+					NvfTrimeshGeo trigeo = colldata->getTriangleMesh(objidname); //TODO: think of a bit of restructurizing collision data, cuz here we need only the common pos-rot-shit thing, and we dont need to specifically get triangle mesh - it can be sdf or whatever as well
+					if (trigeo.collgeo != NULL) { //just for rare case the object data was not created in loop before
+						trigeo.updatePosition(Vec4(pos[0], pos[1], pos[2], 1));
+						trigeo.updateRotation(Quat(rot[0], rot[1], rot[2], rot[3]));
+					}
+				}
+
 			}
 
 			colldata->unmapall();
@@ -452,10 +473,9 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 			GU_Detail *gdp = lock.getGdp();
 
 			int* const iindex = nvdata->_indices.get(); //TODO: indices dont change - if we got them before solve - keep them!
-			const int nactives = NvFlexExtGetActiveList(consolv->container(), iindex); //HERE I REEEEALLY HOPE nooe accesses it right now
+			const int nactives = NvFlexExtGetActiveList(consolv->container(), iindex); //HERE I REEEEALLY HOPE nooe accesses it right now (iindex shared array i mean) 
 			
-			const bool recreateGeo = nactives != gdp->getNumPoints(); //This basically should never happen with current workflow
-
+			const bool recreateGeo = nactives != gdp->getNumPoints(); //This basically should never happen with current workflow.
 			if (recreateGeo) {
 				messageLog(1, "recreate==true. geo inconsistent. %d vs %lld\n", nactives, gdp->getNumPoints());
 			}
@@ -543,8 +563,9 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 			gdp->bumpAllDataIds();
 			//gdp->getAttributes().bumpAllDataIds(GA_ATTRIB_POINT);
 			//gdp->getAttributes().bumpAllDataIds(GA_ATTRIB_PRIMITIVE);
-			nvdata->_lastGdpPId = gdp->getP()->getDataId();
+			nvdata->_lastGdpPId = gdp->getP()->getDataId();			//TODO: potentially there will be a whole bunch of them, so pack them up!
 			nvdata->_lastGdpTId = gdp->getTopology().getDataId();
+			nvdata->_lastGdpVId = vatt.getAttribute()->getDataId();
 			{
 				GA_Attribute *str=gdp->findPrimitiveAttribute("strength");
 				if (str != NULL)nvdata->_lastGdpStrId = str->getDataId();
@@ -766,6 +787,6 @@ const SIM_DopDescription* SIM_NvFlexSolver::getDescriptionForFucktory() {
 }
 
 
-SIM_NvFlexSolver::SIM_NvFlexSolver(const SIM_DataFactory * fack) :SIM_Solver(fack), SIM_OptionsUser(this){}
+SIM_NvFlexSolver::SIM_NvFlexSolver(const SIM_DataFactory * fack) :SIM_Solver(fack), SIM_OptionsUser(this) {}
 
-SIM_NvFlexSolver::~SIM_NvFlexSolver(){}
+SIM_NvFlexSolver::~SIM_NvFlexSolver() {}

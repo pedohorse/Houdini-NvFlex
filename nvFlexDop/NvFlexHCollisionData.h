@@ -1,4 +1,5 @@
 #pragma once
+#include <sys/SYS_Types.h>
 #include <NvFlex.h>
 #include <NvFlexExt.h>
 #include <../core/maths.h>
@@ -12,12 +13,22 @@
 
 template <class T>
 class NvFlexHCollisionGeometryWrapper {
-public:
+public: //TOTHINK: do we want to keep everything exposed?
 	T* collgeo;
 	Vec4* position;
 	Quat* rotation;
 	Vec4* prevposition;
 	Quat* prevrotation;
+
+	void updatePosition(const Vec4 & newPos) {
+		*prevposition = *position;
+		*position = newPos;
+	}
+
+	void updateRotation(const Quat & newRot) {
+		*prevrotation = *rotation;
+		*rotation = newRot;
+	}
 
 	NvFlexHCollisionGeometryWrapper(T* cg, Vec4* p, Quat* r, Vec4* pp, Quat* pr) {
 		collgeo = cg;
@@ -33,10 +44,7 @@ public:
 typedef NvFlexHCollisionGeometryWrapper<NvFlexSphereGeometry> NvfSphereGeo;
 typedef NvFlexHCollisionGeometryWrapper<NvFlexHTriangleMesh> NvfTrimeshGeo;
 
-typedef long long int64;
-
-class NvFlexHCollisionData
-{
+class NvFlexHCollisionData {
 public:
 	NvFlexHCollisionData(NvFlexLibrary*lib);
 	NvFlexHCollisionData(const NvFlexHCollisionData&) = delete;
@@ -44,17 +52,17 @@ public:
 	~NvFlexHCollisionData();
 
 
-	bool hasKey(std::string key);
-	int64 getStoredHash(std::string key);
-	bool setStoredHash(std::string key, int64 hash);
+	bool hasKey(const std::string &key) const;
+	int64 getStoredHash(const std::string &key);
+	bool setStoredHash(const std::string &key, const int64 hash);
 	//add-remove shit
-	bool removeItem(std::string key);
+	bool removeItem(const std::string &key);
 
-	bool addSphere(std::string key);
-	NvfSphereGeo getSphere(std::string key);
+	bool addSphere(const std::string &key);
+	NvfSphereGeo getSphere(const std::string &key) const;
 
-	bool addTriangleMesh(std::string key);
-	NvfTrimeshGeo getTriangleMesh(std::string key);
+	bool addTriangleMesh(const std::string &key);
+	NvfTrimeshGeo getTriangleMesh(const std::string &key) const;
 	//
 	int size() const;
 
