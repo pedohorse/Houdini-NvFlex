@@ -27,7 +27,9 @@ bool releaseCudaContext() {
 void SIM_NvFlexData::initializeSubclass() {
 	SIM_Data::initializeSubclass();
 	_lastGdpPId = -1;
+	_lastGdpVId = -1;
 	_lastGdpTId = -1;
+	_lastGdpStrId = -1;
 
 	
 
@@ -88,7 +90,9 @@ void SIM_NvFlexData::makeEqualSubclass(const SIM_Data* source) {
 	nvdata = src->nvdata;
 	_indices = src->_indices;
 	_lastGdpPId = src->_lastGdpPId;
+	_lastGdpVId = src->_lastGdpVId;
 	_lastGdpTId = src->_lastGdpTId;
+	_lastGdpStrId = src->_lastGdpStrId;
 	_prevMaxPts = src->_prevMaxPts;
 	_valid = _valid && src->_valid;
 	if (!_valid) {
@@ -153,7 +157,7 @@ void delete_NvFlexContainerWrapper(SIM_NvFlexData::NvFlexContainerWrapper *wrp) 
 }
 
 
-SIM_NvFlexData::SIM_NvFlexData(const SIM_DataFactory*fack):SIM_Data(fack),SIM_OptionsUser(this), _indices(nullptr_t(), std::default_delete<int[]>()), nvdata(nullptr_t(), delete_NvFlexContainerWrapper), _lastGdpPId(-1), _lastGdpTId(-1), _lastGdpStrId(-1), _prevMaxPts(-1), _valid(false) {
+SIM_NvFlexData::SIM_NvFlexData(const SIM_DataFactory*fack):SIM_Data(fack),SIM_OptionsUser(this), _indices(nullptr_t(), std::default_delete<int[]>()), nvdata(nullptr_t(), delete_NvFlexContainerWrapper), _lastGdpPId(-1), _lastGdpVId(-1), _lastGdpTId(-1), _lastGdpStrId(-1), _prevMaxPts(-1), _valid(false) {
 	if (nvFlexLibrary != NULL)_valid = true;
 	messageLog(5, "flex data constructed.\n");
 }

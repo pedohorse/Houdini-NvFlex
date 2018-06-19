@@ -51,10 +51,16 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 				int nactives = -1;
 				const GU_Detail *gdp = lock.getGdp();
 				int64 ndid = gdp->getP()->getDataId();
+				int64 nvdid = -1;
+				{
+					const GA_Attribute* vattr=gdp->findPointAttribute("v");
+					if (vattr != NULL) nvdid = vattr->getDataId();
+				}
+				
 				int64 ntopdid = gdp->getTopology().getDataId();
 				messageLog(5, "P data id = %lld\n", ndid);
-				if (ndid != nvdata->_lastGdpPId || ntopdid != nvdata->_lastGdpTId) {
-					messageLog(5, "found geo, new id !! old P id: %lld. old topo id: %lld\n", nvdata->_lastGdpPId, nvdata->_lastGdpTId);
+				if (ndid != nvdata->_lastGdpPId || nvdid != nvdata->_lastGdpVId || ntopdid != nvdata->_lastGdpTId) {
+					messageLog(5, "found geo, new id !! old P id: %lld. old v id: %lld. old topo id: %lld\n", nvdata->_lastGdpPId, nvdata->_lastGdpVId, nvdata->_lastGdpTId);
 
 					//we just search for attribs, not creating them cuz for now we work with RO geometry
 
@@ -557,8 +563,9 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 			gdp->bumpAllDataIds();
 			//gdp->getAttributes().bumpAllDataIds(GA_ATTRIB_POINT);
 			//gdp->getAttributes().bumpAllDataIds(GA_ATTRIB_PRIMITIVE);
-			nvdata->_lastGdpPId = gdp->getP()->getDataId();
+			nvdata->_lastGdpPId = gdp->getP()->getDataId();			//TODO: potentially there will be a whole bunch of them, so pack them up!
 			nvdata->_lastGdpTId = gdp->getTopology().getDataId();
+			nvdata->_lastGdpVId = vatt.getAttribute()->getDataId();
 			{
 				GA_Attribute *str=gdp->findPrimitiveAttribute("strength");
 				if (str != NULL)nvdata->_lastGdpStrId = str->getDataId();
