@@ -460,7 +460,7 @@ SIM_NvFlexSolver::SIM_Result SIM_NvFlexSolver::solveObjectsSubclass(SIM_Engine &
 		NvFlexSetParams(consolv->solver(), &nvparams);
 
 		//NvFlexExtTickContainer(consolv->container(), timestep, substeps, false);
-		messageLog(5, "timestep %f\n", timestep);
+		messageLog(5, "timestep %f\n", (float)timestep);
 		NvFlexUpdateSolver(consolv->solver(), timestep, substeps, false);
 
 		NvFlexExtPullFromDevice(consolv->container());
