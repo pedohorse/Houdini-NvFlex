@@ -1,4 +1,5 @@
 #pragma once
+#include <string.h> // for memcpy required in NvFlexExt.h
 #include <NvFlex.h>
 #include <NvFlexExt.h>
 #include <../core/maths.h>
