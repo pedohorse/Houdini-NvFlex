@@ -2,8 +2,9 @@
 !x64/
 !x64/Release*/
 !x64/Release*/nvFlexDop*.dll*
-!bin/
-!bin/*
+!bin
+!bin/*/
+!bin/*/*
 
 !nvFlexDop/
 !nvFlexDop/*
