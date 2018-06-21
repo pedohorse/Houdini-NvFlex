@@ -1,6 +1,6 @@
 DSONAME = nvFlexDop_$(HOUDINI_MAJOR_RELEASE)$(HOUDINI_MINOR_RELEASE).so
 SOURCES = $(addprefix $(PWD)/, $(shell echo nvFlexDop/*.cpp))
-CC = $(CXX) -std=c++11
+CC = $(CXX)
 
 INSTDIR = $(PWD)/x64/linux64
 INCDIRS = -I$(NVFLEX_DIR)/include

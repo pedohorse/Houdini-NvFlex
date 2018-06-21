@@ -27,7 +27,8 @@ nvFlexDop/**/*.o
 
 !README.md
 !Makefile
-!linux_build.sh
+!linux_build*.sh
+!buildhelper.sh
 
 **.vcxproj.user
 nvFlexDop/x64/
