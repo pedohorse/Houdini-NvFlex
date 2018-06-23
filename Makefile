@@ -5,7 +5,7 @@ CC = $(CXX)
 INSTDIR = $(PWD)/x64/linux64
 INCDIRS = -I$(NVFLEX_DIR)/include
 LIBDIRS = -L$(NVFLEX_DIR)/lib/linux64 
-LIBS = $(NVFLEX_DIR)/lib/linux64/NvFlexReleaseCUDA_x64.a $(NVFLEX_DIR)/lib/linux64/NvFlexDeviceRelease_x64.a $(NVFLEX_DIR)/lib/linux64/NvFlexExtReleaseCUDA_x64.a -lcuda -lcudart
+LIBS = $(NVFLEX_DIR)/lib/linux64/NvFlexReleaseCUDA_x64.a $(NVFLEX_DIR)/lib/linux64/NvFlexDeviceRelease_x64.a $(NVFLEX_DIR)/lib/linux64/NvFlexExtReleaseCUDA_x64.a -lcuda -lcudart_static
 
 include $(HFS)/toolkit/makefiles/Makefile.gnu
 
