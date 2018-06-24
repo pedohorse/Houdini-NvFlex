@@ -1,7 +1,13 @@
 *
+!.gitignore
+
 !x64/
 !x64/Release*/
 !x64/Release*/nvFlexDop*.dll*
+#!x64/*
+#!x64/*/*
+#!x64/*/*/*
+!x64/linux*/*/*/*.so
 !bin
 !bin/*/
 !bin/*/*
@@ -11,12 +17,18 @@
 !nvFlexDop/*/*
 !nvFlexDop/*/*/*
 !nvFlexDop/*/*/*/*
+nvFlexDop/**/*.o
 
 !examples
 !examples/*
 
 !otls
 !otls/*
+
+!README.md
+!Makefile
+!linux_build*.sh
+!buildhelper.sh
 
 **.vcxproj.user
 nvFlexDop/x64/
