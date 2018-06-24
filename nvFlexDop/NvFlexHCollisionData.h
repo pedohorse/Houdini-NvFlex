@@ -1,5 +1,6 @@
 #pragma once
-#include <sys/SYS_Types.h>
+#include <SYS/SYS_Types.h>
+#include <string.h> //for memcpy in NvFlexExt.h
 #include <NvFlex.h>
 #include <NvFlexExt.h>
 #include <../core/maths.h>
