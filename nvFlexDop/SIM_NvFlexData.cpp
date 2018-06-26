@@ -170,6 +170,7 @@ SIM_NvFlexData::~SIM_NvFlexData() {
 
 //wrapper
 bool NvFlexHLibraryHolder::cudaContextCreated = false;
+bool NvFlexHLibraryHolder::_deviceContextAvailable = true;
 NvFlexLibrary* NvFlexHLibraryHolder::nvFlexLibrary = NULL;
 GA_Size NvFlexHLibraryHolder::_instanceCount = 0;
 
@@ -178,26 +179,27 @@ GA_Size NvFlexHLibraryHolder::_instanceCount = 0;
 NvFlexHLibraryHolder::NvFlexHLibraryHolder() {
 	++_instanceCount;
 	if (nvFlexLibrary == NULL) {
-		if (!cudaContextCreated) {
+		if (!cudaContextCreated && _deviceContextAvailable) {
 			try {
 				int cdevice = NvFlexDeviceGetSuggestedOrdinal();
 				if (cdevice == -1) {
-					messageLog(0, "No Cuda device found ! \n");
+					messageLog(1, "FlexDevice: No Cuda device found ! \n");
 					throw std::runtime_error("Failed to initialize Cuda Context");
 				}
 				if (!NvFlexDeviceCreateCudaContext(cdevice)) {
-					messageLog(0, "Failed to initialize Cuda Context\n");
+					messageLog(1, "FlexDevice: Failed to initialize Cuda Context\n");
 					throw std::runtime_error("Failed to initialize Cuda Context");
 				}
 				cudaContextCreated = true;
+				_deviceContextAvailable = true;
 			}
 			catch (...) {
-				messageLog(0, "Critical Error !\n");
-				throw;
+				messageLog(1, "FlexDevice: falling back to default method...\n");
+				_deviceContextAvailable = false;
 			}
 		}
 		NvFlexInitDesc desc;
-		desc.deviceIndex = 0; // ignored, device index is set by the context
+		desc.deviceIndex = 0; // ignored, device index is set by the context. TODO: make an env variable for fallback device
 		desc.enableExtensions = false;
 		desc.renderDevice = NULL;
 		desc.renderContext = NULL;
@@ -229,7 +231,7 @@ NvFlexHLibraryHolder::~NvFlexHLibraryHolder() {
 		NvFlexShutdown(nvFlexLibrary);
 		nvFlexLibrary = NULL;
 		cudaContextAcquiredCount = 0;
-		NvFlexDeviceDestroyCudaContext();
+		if (_deviceContextAvailable) NvFlexDeviceDestroyCudaContext();
 		cudaContextCreated = false;
 		messageLog(5, "flex library destroyed\n");
 	}

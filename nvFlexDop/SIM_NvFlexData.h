@@ -20,6 +20,7 @@ protected:
 	static NvFlexLibrary* nvFlexLibrary;
 	static bool cudaContextCreated;
 private:
+	static bool _deviceContextAvailable;
 	static GA_Size _instanceCount;
 };
 
