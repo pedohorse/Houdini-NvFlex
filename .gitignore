@@ -4,10 +4,10 @@
 !x64/
 !x64/Release*/
 !x64/Release*/nvFlexDop*.dll*
-!x64/*
-!x64/*/*
-!x64/*/*/*
-!x64/*/*/*/*.so
+#!x64/*
+#!x64/*/*
+#!x64/*/*/*
+!x64/linux*/*/*/*.so
 !bin
 !bin/*/
 !bin/*/*
