@@ -21,7 +21,9 @@ void initializeSIM(void*) {
 		setMessageLogLevel(errlvl);
 	}
 	try { //some useless error handling
-		if (NvFlexDeviceGetSuggestedOrdinal() == -1)throw std::runtime_error("CUDA device not found!");
+		{
+			NvFlexHLibraryHolder tester; // check if shit can initialize and deinitialize properly
+		}
 		IMPLEMENT_DATAFACTORY(SIM_NvFlexData);
 		IMPLEMENT_DATAFACTORY(SIM_NvFlexSolver);
 	}
