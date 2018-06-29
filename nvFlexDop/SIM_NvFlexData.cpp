@@ -2,6 +2,8 @@
 #include <PRM/PRM_Default.h>
 #include <NvFlexDevice.h>
 
+#include <cuda.h>
+
 #include "utils.h"
 
 #include "SIM_NvFlexData.h"
@@ -9,6 +11,7 @@
 static void CreateFluidParticleGrid(NvFlexExtParticleData& ptd, int* indices, Vec3 lower, int dimx, int dimy, int dimz, float radius, Vec3 velocity, float invMass, int phase, float jitter = 0.005f);
 
 static uint cudaContextAcquiredCount = 0;
+static bool cudaExplicitlyInitizlized = false;
 
 bool acquireCudaContext() {
 	if (SIM_NvFlexData::nvFlexLibrary == NULL)return false;
@@ -179,25 +182,36 @@ NvFlexHLibraryHolder::NvFlexHLibraryHolder() {
 	++_instanceCount;
 	if (nvFlexLibrary == NULL) {
 		if (!cudaContextCreated) {
-			try {
+			int attempt = 0;
+			if (cudaExplicitlyInitizlized)attempt = 1;
+			for (; attempt < 2; ++attempt) {
+				if (!cudaExplicitlyInitizlized && attempt == 1) {
+					messageLog(3, "initializing CUDA explicitly...\n");
+					CUresult err;
+					if ((err = cuInit(0)) != CUDA_SUCCESS) {
+						messageLog(0, "cuda initialization failed! error code: %d\n", err);
+						throw std::runtime_error("cuda initialization failed!");
+					}
+					cudaExplicitlyInitizlized = true;
+				}
+
 				int cdevice = NvFlexDeviceGetSuggestedOrdinal();
 				if (cdevice == -1) {
-					messageLog(0, "No Cuda device found ! \n");
+					if (attempt < 1)continue;
+					messageLog(1, "FlexDevice: No Cuda device found ! \n");
 					throw std::runtime_error("Failed to initialize Cuda Context");
 				}
 				if (!NvFlexDeviceCreateCudaContext(cdevice)) {
-					messageLog(0, "Failed to initialize Cuda Context\n");
+					if (attempt < 1)continue;
+					messageLog(1, "FlexDevice: Failed to initialize Cuda Context\n");
 					throw std::runtime_error("Failed to initialize Cuda Context");
 				}
 				cudaContextCreated = true;
-			}
-			catch (...) {
-				messageLog(0, "Critical Error !\n");
-				throw;
+				break;
 			}
 		}
 		NvFlexInitDesc desc;
-		desc.deviceIndex = 0; // ignored, device index is set by the context
+		desc.deviceIndex = 0; // ignored, device index is set by the context. TODO: make an env variable for fallback device
 		desc.enableExtensions = false;
 		desc.renderDevice = NULL;
 		desc.renderContext = NULL;
