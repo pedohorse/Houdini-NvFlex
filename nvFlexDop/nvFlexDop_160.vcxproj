@@ -23,6 +23,7 @@
     <ClInclude Include="NvFlexHTriangleMesh.h" />
     <ClInclude Include="SIM_NvFlexData.h" />
     <ClInclude Include="SIM_NvFlexSolver.h" />
+    <ClInclude Include="utils.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="entry.cpp" />
@@ -30,6 +31,7 @@
     <ClCompile Include="NvFlexHTriangleMesh.cpp" />
     <ClCompile Include="SIM_NvFlexData.cpp" />
     <ClCompile Include="SIM_NvFlexSolver.cpp" />
+    <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{1953D92A-F373-4DB2-B03B-51B70F7662F0}</ProjectGuid>
@@ -135,7 +137,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalOptions>-link -LIBPATH:"$(VSInstallDir_140)/VC/lib/amd64" -LIBPATH:"$(UniversalCRT_LibraryPath_x64)" -LIBPATH:"$(WindowsSDK_LibraryPath_x64)"   -LIBPATH:"$(HoudiniPath)/custom/houdini/dsolib" "$(HoudiniPath)/custom/houdini/dsolib/*.a" "$(HoudiniPath)/custom/houdini/dsolib/*.lib" %(AdditionalOptions)</AdditionalOptions>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>cudart.lib;NvFlexReleaseCUDA_x64.lib;NvFlexExtReleaseCUDA_x64.lib;NvFlexDeviceRelease_x64.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cuda.lib;cudart.lib;NvFlexReleaseCUDA_x64.lib;NvFlexExtReleaseCUDA_x64.lib;NvFlexDeviceRelease_x64.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy  "$(OutputPath)$(TargetFileName)" "$(SolutionDir)..\..\dso_16.0\." /Y</Command>

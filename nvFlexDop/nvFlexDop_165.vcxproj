@@ -23,6 +23,7 @@
     <ClInclude Include="NvFlexHTriangleMesh.h" />
     <ClInclude Include="SIM_NvFlexData.h" />
     <ClInclude Include="SIM_NvFlexSolver.h" />
+    <ClInclude Include="utils.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="entry.cpp" />
@@ -30,6 +31,7 @@
     <ClCompile Include="NvFlexHTriangleMesh.cpp" />
     <ClCompile Include="SIM_NvFlexData.cpp" />
     <ClCompile Include="SIM_NvFlexSolver.cpp" />
+    <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{d99dfad9-021e-4a32-b52c-a2eeabb3467c}</ProjectGuid>
@@ -112,7 +114,7 @@
     </ClCompile>
     <Link>
       <AdditionalOptions>-link -LIBPATH:"C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC/lib/amd64" -LIBPATH:"C:/Program Files (x86)/Windows Kits/10/Lib/10.0.10240.0/ucrt/x64" -LIBPATH:"C:/Program Files (x86)/Windows Kits/8.1/Lib/winv6.3/um/x64"   -LIBPATH:"C:/Program Files/Side Effects Software/HOUDIN~1.323/custom/houdini/dsolib" "C:/Program Files/Side Effects Software/HOUDIN~1.323/custom/houdini/dsolib/*.a" "C:/Program Files/Side Effects Software/HOUDIN~1.323/custom/houdini/dsolib/*.lib"</AdditionalOptions>
-      <AdditionalDependencies>cudart.lib;NvFlexDebugCUDA_x64.lib;NvFlexExtDebugCUDA_x64.lib;NvFlexDeviceDebug_x64.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cuda.lib;cudart.lib;NvFlexDebugCUDA_x64.lib;NvFlexExtDebugCUDA_x64.lib;NvFlexDeviceDebug_x64.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <EnableUAC>false</EnableUAC>
     </Link>
   </ItemDefinitionGroup>
@@ -144,7 +146,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalOptions>-link -LIBPATH:"$(VSInstallDir_140)/VC/lib/amd64" -LIBPATH:"$(UniversalCRT_LibraryPath_x64)" -LIBPATH:"$(WindowsSDK_LibraryPath_x64)"   -LIBPATH:"$(HoudiniPath)/custom/houdini/dsolib" "$(HoudiniPath)/custom/houdini/dsolib/*.a" "$(HoudiniPath)/custom/houdini/dsolib/*.lib" %(AdditionalOptions)</AdditionalOptions>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>cudart.lib;NvFlexReleaseCUDA_x64.lib;NvFlexExtReleaseCUDA_x64.lib;NvFlexDeviceRelease_x64.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cuda.lib;cudart.lib;NvFlexReleaseCUDA_x64.lib;NvFlexExtReleaseCUDA_x64.lib;NvFlexDeviceRelease_x64.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy  "$(OutputPath)$(TargetFileName)" "$(SolutionDir)..\..\dso_16.5\." /Y</Command>

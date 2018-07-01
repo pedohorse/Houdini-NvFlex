@@ -2,8 +2,7 @@
 
 
 
-NvFlexHTriangleMesh::NvFlexHTriangleMesh(NvFlexLibrary* lib):vertvec(lib),trivec(lib)
-{
+NvFlexHTriangleMesh::NvFlexHTriangleMesh(NvFlexLibrary* lib):vertvec(lib),trivec(lib) {
 	id = NvFlexCreateTriangleMesh(lib);
 	vertvec.resize(0);
 	trivec.resize(0);
@@ -11,14 +10,13 @@ NvFlexHTriangleMesh::NvFlexHTriangleMesh(NvFlexLibrary* lib):vertvec(lib),trivec
 	trivec.unmap();
 }
 
-NvFlexHTriangleMesh::~NvFlexHTriangleMesh()
-{
+NvFlexHTriangleMesh::~NvFlexHTriangleMesh() {
 	NvFlexDestroyTriangleMesh(vertvec.lib, id);
 	vertvec.destroy(); //actually, NvFlexVector's destructor does that for us, so wtf? u'r lucky he checks if shit has already been destroyed and does nothing second time
 	trivec.destroy(); 
 }
 
-NvFlexTriangleMeshId NvFlexHTriangleMesh::getId() const{
+NvFlexTriangleMeshId NvFlexHTriangleMesh::getId() const {
 	return id;
 }
 
