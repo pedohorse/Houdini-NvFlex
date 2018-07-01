@@ -14,6 +14,14 @@ but i would suggest to copy them into a new folder, for example **C:\mystuff\bin
 Please, see [here](https://superuser.com/questions/949560/how-do-i-set-system-environment-variables-in-windows-10) for instructions how to access environment variables.
 just add your folder to the end of the **PATH** variable. So with example folder above it will looks like **\<CONTENT OF YOUR PATH VARIABLE\>;C:\mystuff\bin\nvflex\\**
 
+## installation (Linux):
+* copy so appropriate for your houdini version from **x64/linux64/dso** folder to your **\<home\>/houdini16.X/dso/** folder (create **dso** subfolder if necessary). These so were compiled with gcc 6.3.0, glibc 2.24-11.
+
+* if you want to compile it yourself:
+  * edit **linux_build_16X.sh** so the helper variables point to the locations of the libraries it requires
+  * launch **linux_build_16X.sh** and if you have all dependencies - build will succeed, and your new so will be put into **x64/linux64/dso** folder
+  * note: depending on your linux distribution you might require different packages. You might also require full Cuda Toolkit **8.0.44** to be able to build, in this case you will have to add paths to your Cuda toolkit to the Makefile. Although some distributions, like debian, have core libs from that toolkit available in reps, so for example for debian - package nvidia-cuda-dev will be enough and you don't have to download full Cuda Toolkit and set any paths manually.
+
 That should do it.
 
 
