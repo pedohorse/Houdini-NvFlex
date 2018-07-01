@@ -11,6 +11,7 @@
 !bin
 !bin/*/
 !bin/*/*
+!bin/*/*/*
 
 !nvFlexDop/
 !nvFlexDop/*
